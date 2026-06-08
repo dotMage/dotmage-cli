@@ -1,10 +1,23 @@
 //! Abstract storage backend trait matching the API contract (Appendix B).
 
+use std::any::Any;
+
 use crate::types::*;
+
+/// Helper trait for downcasting trait objects.
+pub trait AsAny {
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl<T: 'static> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
 /// Backend abstraction over dotMage storage.
 /// FsBackend implements this for local testing; HttpBackend for real server.
-pub trait Backend {
+pub trait Backend: AsAny {
     // --- Account ---
     fn account_exists(&self) -> Result<bool, BackendError>;
     fn account_init(&self, req: &AccountInitReq) -> Result<AccountInitResp, BackendError>;

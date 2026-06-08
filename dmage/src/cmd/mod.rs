@@ -5,6 +5,7 @@ pub mod auth;
 pub mod diff;
 pub mod env;
 pub mod exec;
+pub mod gen_token;
 pub mod history;
 pub mod init;
 pub mod lock;

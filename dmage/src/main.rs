@@ -198,10 +198,7 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
         Commands::Status => cmd::status::run(&ctx),
         Commands::Lock => cmd::lock::run(&ctx),
         Commands::Logout => cmd::lock::run_logout(&ctx),
-        Commands::GenToken { .. } => {
-            eprintln!("gen-token: requires server (Phase 4)");
-            Ok(())
-        }
+        Commands::GenToken { name, ttl } => cmd::gen_token::run(&ctx, name.as_deref(), &ttl),
         Commands::Env { action } => cmd::env::run(
             &ctx,
             action.map(|a| match a {

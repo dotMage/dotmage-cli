@@ -1,17 +1,24 @@
 //! HTTP-based storage backend — talks to dotMage server API.
 
+use std::cell::RefCell;
+
 use reqwest::blocking::Client;
 use reqwest::StatusCode;
 use serde::Deserialize;
 
 use crate::backend::{Backend, BackendError};
+use crate::keychain;
+use crate::token::{self, ServerTokens};
 use crate::types::*;
 
 /// A backend that communicates with the dotMage server over HTTP.
+/// Uses RefCell for interior mutability so token refresh works through `&self`.
 pub struct HttpBackend {
     base_url: String,
     client: Client,
-    token: String,
+    token: RefCell<String>,
+    refresh_token: RefCell<String>,
+    server_hash: String,
 }
 
 #[derive(Deserialize)]
@@ -24,25 +31,151 @@ struct ErrorDetail {
     message: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct RefreshResp {
+    device_token: String,
+    refresh_token: String,
+    device_id: String,
+    token_expires_at: String,
+}
+
 impl HttpBackend {
     pub fn new(base_url: &str, device_token: &str) -> Self {
+        let server_hash = keychain::server_hash(base_url);
+        let refresh = token::load_tokens(&server_hash)
+            .ok()
+            .flatten()
+            .map(|t| t.refresh_token)
+            .unwrap_or_default();
+
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             client: Client::new(),
-            token: device_token.to_string(),
+            token: RefCell::new(device_token.to_string()),
+            refresh_token: RefCell::new(refresh),
+            server_hash,
         }
-    }
-
-    pub fn set_token(&mut self, token: &str) {
-        self.token = token.to_string();
     }
 
     fn url(&self, path: &str) -> String {
         format!("{}/api/v1{}", self.base_url, path)
     }
 
-    fn auth_header(&self) -> (&str, String) {
-        ("Authorization", format!("Bearer {}", self.token))
+    fn auth_header(&self) -> (String, String) {
+        (
+            "Authorization".to_string(),
+            format!("Bearer {}", self.token.borrow()),
+        )
+    }
+
+    /// Make an authenticated GET request with auto-refresh on 401.
+    fn auth_get(&self, path: &str) -> Result<(StatusCode, String), BackendError> {
+        let (hdr, val) = self.auth_header();
+        let resp = self
+            .client
+            .get(self.url(path))
+            .header(&hdr, &val)
+            .send()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+
+        if resp.status() == StatusCode::UNAUTHORIZED && self.try_refresh()? {
+            let (hdr2, val2) = self.auth_header();
+            let resp2 = self
+                .client
+                .get(self.url(path))
+                .header(&hdr2, &val2)
+                .send()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
+            let status = resp2.status();
+            let body = resp2
+                .text()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
+            return Ok((status, body));
+        }
+
+        let status = resp.status();
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+        Ok((status, body))
+    }
+
+    /// Make an authenticated POST request with auto-refresh on 401.
+    fn auth_post_json(
+        &self,
+        path: &str,
+        json: &serde_json::Value,
+    ) -> Result<(StatusCode, String), BackendError> {
+        let (hdr, val) = self.auth_header();
+        let resp = self
+            .client
+            .post(self.url(path))
+            .header(&hdr, &val)
+            .json(json)
+            .send()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+
+        if resp.status() == StatusCode::UNAUTHORIZED && self.try_refresh()? {
+            let (hdr2, val2) = self.auth_header();
+            let resp2 = self
+                .client
+                .post(self.url(path))
+                .header(&hdr2, &val2)
+                .json(json)
+                .send()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
+            let status = resp2.status();
+            let body = resp2
+                .text()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
+            return Ok((status, body));
+        }
+
+        let status = resp.status();
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+        Ok((status, body))
+    }
+
+    /// Try to refresh the device token. Returns true if successful.
+    fn try_refresh(&self) -> Result<bool, BackendError> {
+        let refresh = self.refresh_token.borrow().clone();
+        if refresh.is_empty() {
+            return Ok(false);
+        }
+
+        let resp = self
+            .client
+            .post(self.url("/auth/refresh"))
+            .json(&serde_json::json!({"refresh_token": refresh}))
+            .send()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            return Ok(false);
+        }
+
+        let data: RefreshResp = resp
+            .json()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+
+        // Update in-memory tokens
+        *self.token.borrow_mut() = data.device_token.clone();
+        *self.refresh_token.borrow_mut() = data.refresh_token.clone();
+
+        // Persist to disk
+        let _ = token::save_tokens(
+            &self.server_hash,
+            &ServerTokens {
+                device_token: data.device_token,
+                refresh_token: data.refresh_token,
+                device_id: data.device_id,
+            },
+        );
+
+        Ok(true)
     }
 
     fn extract_error(status: StatusCode, body: &str) -> BackendError {
@@ -57,6 +190,33 @@ impl HttpBackend {
             }
         }
         BackendError::Other(format!("HTTP {status}: {body}"))
+    }
+
+    // --- Methods outside Backend trait (device management) ---
+
+    /// Generate an enrollment token for adding a new device.
+    pub fn gen_enroll_token(
+        &self,
+        name: &str,
+        ttl: &str,
+    ) -> Result<(String, String), BackendError> {
+        let (status, body) = self.auth_post_json(
+            "/devices/enroll-token",
+            &serde_json::json!({"name": name, "ttl": ttl, "kind": "enrollment"}),
+        )?;
+
+        if !status.is_success() {
+            return Err(Self::extract_error(status, &body));
+        }
+
+        #[derive(Deserialize)]
+        struct Resp {
+            token: String,
+            expires_at: String,
+        }
+        let parsed: Resp =
+            serde_json::from_str(&body).map_err(|e| BackendError::Other(e.to_string()))?;
+        Ok((parsed.token, parsed.expires_at))
     }
 }
 
@@ -74,7 +234,6 @@ impl Backend for HttpBackend {
     }
 
     fn account_init(&self, req: &AccountInitReq) -> Result<AccountInitResp, BackendError> {
-        // Server expects flat argon fields, not nested argon_params
         let body = serde_json::json!({
             "salt": req.salt,
             "argon_memory": req.argon_params.memory,
@@ -107,26 +266,14 @@ impl Backend for HttpBackend {
     }
 
     fn get_account_keys(&self) -> Result<AccountKeys, BackendError> {
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .get(self.url("/account/keys"))
-            .header(hdr, val)
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
-
-        let status = resp.status();
+        let (status, body) = self.auth_get("/account/keys")?;
         if status == StatusCode::NOT_FOUND {
             return Err(BackendError::NotInitialized);
         }
-        let body = resp
-            .text()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
 
-        // Server returns flat argon fields; map to nested struct
         #[derive(Deserialize)]
         struct FlatKeys {
             salt: String,
@@ -164,7 +311,7 @@ impl Backend for HttpBackend {
         let resp = self
             .client
             .patch(self.url("/account/keys"))
-            .header(hdr, val)
+            .header(&hdr, &val)
             .json(keys)
             .send()
             .map_err(|e| BackendError::Other(e.to_string()))?;
@@ -180,18 +327,7 @@ impl Backend for HttpBackend {
     }
 
     fn list_apps(&self) -> Result<Vec<AppInfo>, BackendError> {
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .get(self.url("/apps"))
-            .header(hdr, val)
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
-
-        let status = resp.status();
-        let body = resp
-            .text()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+        let (status, body) = self.auth_get("/apps")?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -230,38 +366,15 @@ impl Backend for HttpBackend {
     }
 
     fn create_app(&self, name: &str) -> Result<(), BackendError> {
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .post(self.url("/apps"))
-            .header(hdr, val)
-            .json(&serde_json::json!({"name": name}))
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
-
-        let status = resp.status();
+        let (status, body) = self.auth_post_json("/apps", &serde_json::json!({"name": name}))?;
         if !status.is_success() {
-            let body = resp
-                .text()
-                .map_err(|e| BackendError::Other(e.to_string()))?;
             return Err(Self::extract_error(status, &body));
         }
         Ok(())
     }
 
     fn list_envs(&self, app: &str) -> Result<Vec<EnvInfo>, BackendError> {
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .get(self.url(&format!("/apps/{app}/envs")))
-            .header(hdr, val)
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
-
-        let status = resp.status();
-        let body = resp
-            .text()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+        let (status, body) = self.auth_get(&format!("/apps/{app}/envs"))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -296,25 +409,13 @@ impl Backend for HttpBackend {
         env: &str,
         copy_from: Option<&str>,
     ) -> Result<(), BackendError> {
-        let (hdr, val) = self.auth_header();
         let mut body = serde_json::json!({"name": env});
         if let Some(src) = copy_from {
             body["copy_from"] = serde_json::Value::String(src.to_string());
         }
-        let resp = self
-            .client
-            .post(self.url(&format!("/apps/{app}/envs")))
-            .header(hdr, val)
-            .json(&body)
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
-
-        let status = resp.status();
+        let (status, resp_body) = self.auth_post_json(&format!("/apps/{app}/envs"), &body)?;
         if !status.is_success() {
-            let body = resp
-                .text()
-                .map_err(|e| BackendError::Other(e.to_string()))?;
-            return Err(Self::extract_error(status, &body));
+            return Err(Self::extract_error(status, &resp_body));
         }
         Ok(())
     }
@@ -324,7 +425,7 @@ impl Backend for HttpBackend {
         let resp = self
             .client
             .delete(self.url(&format!("/apps/{app}/envs/{env}")))
-            .header(hdr, val)
+            .header(&hdr, &val)
             .send()
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
@@ -345,23 +446,15 @@ impl Backend for HttpBackend {
         blob: &str,
         parent_rev: u64,
     ) -> Result<RevisionMeta, BackendError> {
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .post(self.url(&format!("/apps/{app}/envs/{env}/revisions")))
-            .header(hdr, val)
-            .json(&serde_json::json!({
+        let (status, body) = self.auth_post_json(
+            &format!("/apps/{app}/envs/{env}/revisions"),
+            &serde_json::json!({
                 "blob": blob,
                 "parent_rev": parent_rev,
                 "content_hash": null
-            }))
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+            }),
+        )?;
 
-        let status = resp.status();
-        let body = resp
-            .text()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -388,18 +481,8 @@ impl Backend for HttpBackend {
             RevSpec::Latest => "last".to_string(),
             RevSpec::Number(n) => n.to_string(),
         };
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .get(self.url(&format!("/apps/{app}/envs/{env}/revisions/{rev_str}")))
-            .header(hdr, val)
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
-
-        let status = resp.status();
-        let body = resp
-            .text()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+        let (status, body) =
+            self.auth_get(&format!("/apps/{app}/envs/{env}/revisions/{rev_str}"))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -407,18 +490,7 @@ impl Backend for HttpBackend {
     }
 
     fn list_revisions(&self, app: &str, env: &str) -> Result<Vec<RevisionMeta>, BackendError> {
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .get(self.url(&format!("/apps/{app}/envs/{env}/revisions")))
-            .header(hdr, val)
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
-
-        let status = resp.status();
-        let body = resp
-            .text()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+        let (status, body) = self.auth_get(&format!("/apps/{app}/envs/{env}/revisions"))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -433,19 +505,11 @@ impl Backend for HttpBackend {
     }
 
     fn rollback(&self, app: &str, env: &str, to_rev: u64) -> Result<RevisionMeta, BackendError> {
-        let (hdr, val) = self.auth_header();
-        let resp = self
-            .client
-            .post(self.url(&format!("/apps/{app}/envs/{env}/rollback")))
-            .header(hdr, val)
-            .json(&serde_json::json!({"to_rev": to_rev}))
-            .send()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+        let (status, body) = self.auth_post_json(
+            &format!("/apps/{app}/envs/{env}/rollback"),
+            &serde_json::json!({"to_rev": to_rev}),
+        )?;
 
-        let status = resp.status();
-        let body = resp
-            .text()
-            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
