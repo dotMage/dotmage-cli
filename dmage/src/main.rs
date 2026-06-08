@@ -106,6 +106,8 @@ enum Commands {
     },
     /// List all applications.
     Apps,
+    /// Show current device token (for web admin login).
+    Token,
     /// Show sync status.
     Status,
     /// Remove AK from keychain (keep device token).
@@ -195,6 +197,7 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
         Commands::History { name } => cmd::history::run(&ctx, &name),
         Commands::Rollback { name, rev } => cmd::rollback::run(&mut ctx, &name, rev),
         Commands::Apps => cmd::apps::run(&ctx),
+        Commands::Token => cmd::token_cmd::run(&ctx),
         Commands::Status => cmd::status::run(&ctx),
         Commands::Lock => cmd::lock::run(&ctx),
         Commands::Logout => cmd::lock::run_logout(&ctx),

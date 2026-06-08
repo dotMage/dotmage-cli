@@ -13,6 +13,7 @@ pub mod pull;
 pub mod push;
 pub mod rollback;
 pub mod status;
+pub mod token_cmd;
 
 use dotmage_client::backend::Backend;
 use dotmage_client::backend_fs::FsBackend;
