@@ -48,9 +48,11 @@ pub struct AccountInitReq {
 /// Account init response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountInitResp {
+    #[serde(alias = "device_id")]
     pub account_id: String,
     pub device_token: String,
     pub refresh_token: String,
+    #[serde(alias = "token_expires_at")]
     pub expires_at: String,
 }
 

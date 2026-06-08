@@ -72,10 +72,25 @@ impl Backend for HttpBackend {
     }
 
     fn account_init(&self, req: &AccountInitReq) -> Result<AccountInitResp, BackendError> {
+        // Server expects flat argon fields, not nested argon_params
+        let body = serde_json::json!({
+            "salt": req.salt,
+            "argon_memory": req.argon_params.memory,
+            "argon_iterations": req.argon_params.iterations,
+            "argon_parallelism": req.argon_params.parallelism,
+            "argon_version": req.argon_params.version,
+            "nonce_ak": req.nonce_ak,
+            "wrapped_ak": req.wrapped_ak,
+            "device_name": req.device_name,
+            "bootstrap_secret": req.bootstrap_secret,
+            "salt_rc": req.salt_rc,
+            "nonce_rc": req.nonce_rc,
+            "wrapped_ak_rc": req.wrapped_ak_rc,
+        });
         let resp = self
             .client
             .post(self.url("/account/init"))
-            .json(req)
+            .json(&body)
             .send()
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
@@ -104,7 +119,38 @@ impl Backend for HttpBackend {
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
-        serde_json::from_str(&body).map_err(|e| BackendError::Other(e.to_string()))
+
+        // Server returns flat argon fields; map to nested struct
+        #[derive(Deserialize)]
+        struct FlatKeys {
+            salt: String,
+            argon_memory: u32,
+            argon_iterations: u32,
+            argon_parallelism: u32,
+            argon_version: u32,
+            nonce_ak: String,
+            wrapped_ak: String,
+            salt_rc: Option<String>,
+            nonce_rc: Option<String>,
+            wrapped_ak_rc: Option<String>,
+        }
+
+        let flat: FlatKeys =
+            serde_json::from_str(&body).map_err(|e| BackendError::Other(e.to_string()))?;
+        Ok(AccountKeys {
+            salt: flat.salt,
+            argon_params: ArgonParamsDto {
+                memory: flat.argon_memory,
+                iterations: flat.argon_iterations,
+                parallelism: flat.argon_parallelism,
+                version: flat.argon_version,
+            },
+            nonce_ak: flat.nonce_ak,
+            wrapped_ak: flat.wrapped_ak,
+            salt_rc: flat.salt_rc,
+            nonce_rc: flat.nonce_rc,
+            wrapped_ak_rc: flat.wrapped_ak_rc,
+        })
     }
 
     fn update_account_keys(&self, keys: &AccountKeys) -> Result<(), BackendError> {
