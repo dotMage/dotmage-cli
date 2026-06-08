@@ -1,30 +1,58 @@
-//! Abstract storage backend trait.
+//! Abstract storage backend trait matching the API contract (Appendix B).
 
-/// A storage backend that can read and write encrypted environment files.
+use crate::types::*;
+
+/// Backend abstraction over dotMage storage.
+/// FsBackend implements this for local testing; HttpBackend for real server.
 pub trait Backend {
-    /// Fetch the encrypted envelope for the given app/environment.
-    fn fetch(
-        &self,
-        app: &str,
-        env: &str,
-    ) -> Result<Vec<u8>, BackendError>;
+    // --- Account ---
+    fn account_exists(&self) -> Result<bool, BackendError>;
+    fn account_init(&self, req: &AccountInitReq) -> Result<AccountInitResp, BackendError>;
+    fn get_account_keys(&self) -> Result<AccountKeys, BackendError>;
+    fn update_account_keys(&self, keys: &AccountKeys) -> Result<(), BackendError>;
 
-    /// Store an encrypted envelope for the given app/environment.
-    fn store(
+    // --- Apps ---
+    fn list_apps(&self) -> Result<Vec<AppInfo>, BackendError>;
+    fn create_app(&self, name: &str) -> Result<(), BackendError>;
+
+    // --- Environments ---
+    fn list_envs(&self, app: &str) -> Result<Vec<EnvInfo>, BackendError>;
+    fn create_env(&self, app: &str, env: &str, copy_from: Option<&str>) -> Result<(), BackendError>;
+    fn delete_env(&self, app: &str, env: &str) -> Result<(), BackendError>;
+
+    // --- Revisions ---
+    fn push_revision(
         &self,
         app: &str,
         env: &str,
-        data: &[u8],
-    ) -> Result<(), BackendError>;
+        blob: &str,
+        parent_rev: u64,
+    ) -> Result<RevisionMeta, BackendError>;
+
+    fn pull_revision(
+        &self,
+        app: &str,
+        env: &str,
+        rev: &RevSpec,
+    ) -> Result<Revision, BackendError>;
+
+    fn list_revisions(&self, app: &str, env: &str) -> Result<Vec<RevisionMeta>, BackendError>;
+
+    fn rollback(&self, app: &str, env: &str, to_rev: u64) -> Result<RevisionMeta, BackendError>;
 }
 
-/// Errors that can occur in a backend.
 #[derive(Debug, thiserror::Error)]
 pub enum BackendError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("not found: {app}/{env}")]
-    NotFound { app: String, env: String },
-    #[error("backend error: {0}")]
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("already exists: {0}")]
+    AlreadyExists(String),
+    #[error("conflict: {0}")]
+    Conflict(String),
+    #[error("not initialized")]
+    NotInitialized,
+    #[error("{0}")]
     Other(String),
 }
