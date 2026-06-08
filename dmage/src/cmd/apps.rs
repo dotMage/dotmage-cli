@@ -17,12 +17,7 @@ pub fn run(ctx: &Context) -> Result<(), CliError> {
         } else {
             app.updated_at[..std::cmp::min(19, app.updated_at.len())].to_string()
         };
-        println!(
-            "{:<16} {:<8} {}",
-            app.name,
-            app.environments.len(),
-            updated
-        );
+        println!("{:<16} {:<8} {}", app.name, app.environments.len(), updated);
     }
     Ok(())
 }

@@ -107,8 +107,12 @@ impl CliError {
     pub fn exit_code(&self) -> ExitCode {
         match self {
             CliError::NotAuthenticated => ExitCode::from(3),
-            CliError::Backend(dotmage_client::backend::BackendError::Conflict(_)) => ExitCode::from(4),
-            CliError::Backend(dotmage_client::backend::BackendError::NotFound(_)) => ExitCode::from(1),
+            CliError::Backend(dotmage_client::backend::BackendError::Conflict(_)) => {
+                ExitCode::from(4)
+            }
+            CliError::Backend(dotmage_client::backend::BackendError::NotFound(_)) => {
+                ExitCode::from(1)
+            }
             _ => ExitCode::from(1),
         }
     }

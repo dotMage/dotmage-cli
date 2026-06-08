@@ -125,8 +125,7 @@ fn full_cycle_against_real_server() {
 
     // 6. Push
     let plaintext = b"DATABASE_URL=postgres://test\nAPI_KEY=secret123\n";
-    let encrypted =
-        secret::encrypt_secret(&ak, plaintext, "integration-app", "dev", 1).unwrap();
+    let encrypted = secret::encrypt_secret(&ak, plaintext, "integration-app", "dev", 1).unwrap();
     let blob_str = blob::encode_blob(&encrypted);
 
     let push_meta = backend
@@ -141,27 +140,22 @@ fn full_cycle_against_real_server() {
     assert_eq!(rev.rev_number, 1);
 
     let decoded = blob::decode_blob(&rev.blob).unwrap();
-    let decrypted =
-        secret::decrypt_secret(&ak, &decoded, "integration-app", "dev", 1).unwrap();
+    let decrypted = secret::decrypt_secret(&ak, &decoded, "integration-app", "dev", 1).unwrap();
     assert_eq!(decrypted, plaintext);
 
     // 8. Push rev 2
     let plaintext2 = b"DATABASE_URL=postgres://prod\nAPI_KEY=newkey\n";
-    let encrypted2 =
-        secret::encrypt_secret(&ak, plaintext2, "integration-app", "dev", 2).unwrap();
+    let encrypted2 = secret::encrypt_secret(&ak, plaintext2, "integration-app", "dev", 2).unwrap();
     backend
         .push_revision("integration-app", "dev", &blob::encode_blob(&encrypted2), 1)
         .unwrap();
 
     // 9. History
-    let history = backend
-        .list_revisions("integration-app", "dev")
-        .unwrap();
+    let history = backend.list_revisions("integration-app", "dev").unwrap();
     assert_eq!(history.len(), 2);
 
     // 10. Conflict detection
-    let encrypted3 =
-        secret::encrypt_secret(&ak, b"STALE", "integration-app", "dev", 3).unwrap();
+    let encrypted3 = secret::encrypt_secret(&ak, b"STALE", "integration-app", "dev", 3).unwrap();
     let conflict = backend.push_revision(
         "integration-app",
         "dev",

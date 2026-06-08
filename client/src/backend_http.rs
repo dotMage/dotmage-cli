@@ -67,7 +67,9 @@ impl Backend for HttpBackend {
             .get(format!("{}/health", self.base_url))
             .send()
             .map_err(|e| BackendError::Other(e.to_string()))?;
-        let data: HealthInfo = resp.json().map_err(|e| BackendError::Other(e.to_string()))?;
+        let data: HealthInfo = resp
+            .json()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         Ok(data.account_exists)
     }
 
@@ -95,7 +97,9 @@ impl Backend for HttpBackend {
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
         let status = resp.status();
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -115,7 +119,9 @@ impl Backend for HttpBackend {
         if status == StatusCode::NOT_FOUND {
             return Err(BackendError::NotInitialized);
         }
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -165,7 +171,9 @@ impl Backend for HttpBackend {
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+            let body = resp
+                .text()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
             return Err(Self::extract_error(status, &body));
         }
         Ok(())
@@ -181,7 +189,9 @@ impl Backend for HttpBackend {
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
         let status = resp.status();
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -231,7 +241,9 @@ impl Backend for HttpBackend {
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+            let body = resp
+                .text()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
             return Err(Self::extract_error(status, &body));
         }
         Ok(())
@@ -247,7 +259,9 @@ impl Backend for HttpBackend {
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
         let status = resp.status();
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -297,7 +311,9 @@ impl Backend for HttpBackend {
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+            let body = resp
+                .text()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
             return Err(Self::extract_error(status, &body));
         }
         Ok(())
@@ -314,7 +330,9 @@ impl Backend for HttpBackend {
 
         let status = resp.status();
         if !status.is_success() {
-            let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+            let body = resp
+                .text()
+                .map_err(|e| BackendError::Other(e.to_string()))?;
             return Err(Self::extract_error(status, &body));
         }
         Ok(())
@@ -341,7 +359,9 @@ impl Backend for HttpBackend {
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
         let status = resp.status();
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -363,12 +383,7 @@ impl Backend for HttpBackend {
         })
     }
 
-    fn pull_revision(
-        &self,
-        app: &str,
-        env: &str,
-        rev: &RevSpec,
-    ) -> Result<Revision, BackendError> {
+    fn pull_revision(&self, app: &str, env: &str, rev: &RevSpec) -> Result<Revision, BackendError> {
         let rev_str = match rev {
             RevSpec::Latest => "last".to_string(),
             RevSpec::Number(n) => n.to_string(),
@@ -382,7 +397,9 @@ impl Backend for HttpBackend {
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
         let status = resp.status();
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -399,7 +416,9 @@ impl Backend for HttpBackend {
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
         let status = resp.status();
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -424,7 +443,9 @@ impl Backend for HttpBackend {
             .map_err(|e| BackendError::Other(e.to_string()))?;
 
         let status = resp.status();
-        let body = resp.text().map_err(|e| BackendError::Other(e.to_string()))?;
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }

@@ -33,7 +33,8 @@ pub fn run(ctx: &mut Context, name: &str, file: &str) -> Result<(), CliError> {
         .map_err(|e| CliError::Crypto(e.to_string()))?;
     let blob_str = blob::encode_blob(&encrypted);
 
-    ctx.backend.push_revision(name, &ctx.active_env, &blob_str, 0)?;
+    ctx.backend
+        .push_revision(name, &ctx.active_env, &blob_str, 0)?;
 
     ctx.print(&format!(
         "Created app '{name}'. Pushed revision 1 from {file} ({key_count} keys)."

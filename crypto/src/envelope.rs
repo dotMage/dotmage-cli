@@ -46,7 +46,10 @@ pub fn wrap_ak(mk: &MasterKey, ak: &[u8; AK_LEN]) -> Result<WrappedAk, EnvelopeE
 }
 
 /// Unwrap AK from its envelope using MK (spec A.3).
-pub fn unwrap_ak(mk: &MasterKey, wrapped: &WrappedAk) -> Result<Zeroizing<[u8; AK_LEN]>, EnvelopeError> {
+pub fn unwrap_ak(
+    mk: &MasterKey,
+    wrapped: &WrappedAk,
+) -> Result<Zeroizing<[u8; AK_LEN]>, EnvelopeError> {
     let cipher = XChaCha20Poly1305::new(mk.as_bytes().into());
 
     let payload = Payload {
@@ -56,7 +59,11 @@ pub fn unwrap_ak(mk: &MasterKey, wrapped: &WrappedAk) -> Result<Zeroizing<[u8; A
 
     let plaintext = cipher
         .decrypt((&wrapped.nonce).into(), payload)
-        .map_err(|_| EnvelopeError::Decryption("AEAD authentication failed (wrong password or tampered data)".into()))?;
+        .map_err(|_| {
+            EnvelopeError::Decryption(
+                "AEAD authentication failed (wrong password or tampered data)".into(),
+            )
+        })?;
 
     let ak: [u8; AK_LEN] = plaintext
         .try_into()
@@ -85,7 +92,10 @@ pub fn wrap_ak_recovery(rk: &[u8; AK_LEN], ak: &[u8; AK_LEN]) -> Result<WrappedA
 }
 
 /// Unwrap AK using a recovery key (spec Appendix J).
-pub fn unwrap_ak_recovery(rk: &[u8; AK_LEN], wrapped: &WrappedAk) -> Result<Zeroizing<[u8; AK_LEN]>, EnvelopeError> {
+pub fn unwrap_ak_recovery(
+    rk: &[u8; AK_LEN],
+    wrapped: &WrappedAk,
+) -> Result<Zeroizing<[u8; AK_LEN]>, EnvelopeError> {
     let cipher = XChaCha20Poly1305::new(rk.into());
 
     let payload = Payload {
@@ -95,7 +105,11 @@ pub fn unwrap_ak_recovery(rk: &[u8; AK_LEN], wrapped: &WrappedAk) -> Result<Zero
 
     let plaintext = cipher
         .decrypt((&wrapped.nonce).into(), payload)
-        .map_err(|_| EnvelopeError::Decryption("AEAD authentication failed (wrong recovery code or tampered data)".into()))?;
+        .map_err(|_| {
+            EnvelopeError::Decryption(
+                "AEAD authentication failed (wrong recovery code or tampered data)".into(),
+            )
+        })?;
 
     let mut ak = Zeroizing::new([0u8; AK_LEN]);
     ak.copy_from_slice(&plaintext);

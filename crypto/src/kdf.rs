@@ -58,8 +58,13 @@ pub fn derive_master_key_with_params(
     salt: &[u8; SALT_LEN],
     params: &ArgonParams,
 ) -> Result<MasterKey, KdfError> {
-    let argon_params = Params::new(params.memory, params.iterations, params.parallelism, Some(MK_LEN))
-        .map_err(|e| KdfError::Argon2(e.to_string()))?;
+    let argon_params = Params::new(
+        params.memory,
+        params.iterations,
+        params.parallelism,
+        Some(MK_LEN),
+    )
+    .map_err(|e| KdfError::Argon2(e.to_string()))?;
 
     let version = match params.version {
         0x13 => Version::V0x13,

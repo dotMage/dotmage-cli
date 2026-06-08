@@ -14,13 +14,12 @@ pub fn run(ctx: &mut Context, name: &str, command: &[String]) -> Result<(), CliE
     let ak = ctx.require_ak()?;
     let env_name = ctx.active_env.clone();
 
-    let revision = ctx.backend.pull_revision(name, &env_name, &RevSpec::Latest)?;
-    let decoded = blob::decode_blob(&revision.blob)
+    let revision = ctx
+        .backend
+        .pull_revision(name, &env_name, &RevSpec::Latest)?;
+    let decoded = blob::decode_blob(&revision.blob).map_err(|e| CliError::Crypto(e.to_string()))?;
+    let plaintext = secret::decrypt_secret(&ak, &decoded, name, &env_name, revision.rev_number)
         .map_err(|e| CliError::Crypto(e.to_string()))?;
-    let plaintext = secret::decrypt_secret(
-        &ak, &decoded, name, &env_name, revision.rev_number,
-    )
-    .map_err(|e| CliError::Crypto(e.to_string()))?;
 
     // Parse .env content into key-value pairs
     let env_vars = parse_env(&plaintext);

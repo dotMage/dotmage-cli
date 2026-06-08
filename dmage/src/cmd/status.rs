@@ -19,7 +19,11 @@ pub fn run(ctx: &Context) -> Result<(), CliError> {
                 app.name,
                 env.name,
                 env.latest_rev,
-                if env.updated_at.is_empty() { "-" } else { &env.updated_at[..std::cmp::min(19, env.updated_at.len())] }
+                if env.updated_at.is_empty() {
+                    "-"
+                } else {
+                    &env.updated_at[..std::cmp::min(19, env.updated_at.len())]
+                }
             );
         }
     }

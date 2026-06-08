@@ -6,7 +6,11 @@ use std::process::ExitCode;
 mod cmd;
 
 #[derive(Parser)]
-#[command(name = "dmage", version, about = "dotMage — E2E-encrypted .env secret manager")]
+#[command(
+    name = "dmage",
+    version,
+    about = "dotMage — E2E-encrypted .env secret manager"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -172,9 +176,20 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
         Commands::Auth { server, ttl, .. } => cmd::auth::run(&mut ctx, server, ttl),
         Commands::Init { name, file } => cmd::init::run(&mut ctx, &name, &file),
         Commands::Push { name, file } => cmd::push::run(&mut ctx, &name, &file),
-        Commands::Pull { name, rev, output, stdout, force } => {
-            cmd::pull::run(&mut ctx, &name, rev.as_deref(), output.as_deref(), stdout, force)
-        }
+        Commands::Pull {
+            name,
+            rev,
+            output,
+            stdout,
+            force,
+        } => cmd::pull::run(
+            &mut ctx,
+            &name,
+            rev.as_deref(),
+            output.as_deref(),
+            stdout,
+            force,
+        ),
         Commands::Exec { name, command } => cmd::exec::run(&mut ctx, &name, &command),
         Commands::Diff { name, show_values } => cmd::diff::run(&mut ctx, &name, show_values),
         Commands::History { name } => cmd::history::run(&ctx, &name),
@@ -187,10 +202,17 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
             eprintln!("gen-token: requires server (Phase 4)");
             Ok(())
         }
-        Commands::Env { action } => cmd::env::run(&ctx, action.map(|a| match a {
-            EnvAction::List { name } => cmd::env::EnvCmd::List(name),
-            EnvAction::New { app, name, copy_from } => cmd::env::EnvCmd::New(app, name, copy_from),
-            EnvAction::Rm { app, name, yes } => cmd::env::EnvCmd::Rm(app, name, yes),
-        })),
+        Commands::Env { action } => cmd::env::run(
+            &ctx,
+            action.map(|a| match a {
+                EnvAction::List { name } => cmd::env::EnvCmd::List(name),
+                EnvAction::New {
+                    app,
+                    name,
+                    copy_from,
+                } => cmd::env::EnvCmd::New(app, name, copy_from),
+                EnvAction::Rm { app, name, yes } => cmd::env::EnvCmd::Rm(app, name, yes),
+            }),
+        ),
     }
 }

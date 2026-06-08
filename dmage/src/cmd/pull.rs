@@ -27,17 +27,10 @@ pub fn run(
 
     let revision = ctx.backend.pull_revision(name, &env_name, &rev_spec)?;
 
-    let decoded = blob::decode_blob(&revision.blob)
-        .map_err(|e| CliError::Crypto(e.to_string()))?;
+    let decoded = blob::decode_blob(&revision.blob).map_err(|e| CliError::Crypto(e.to_string()))?;
 
-    let plaintext = secret::decrypt_secret(
-        &ak,
-        &decoded,
-        name,
-        &env_name,
-        revision.rev_number,
-    )
-    .map_err(|e| CliError::Crypto(e.to_string()))?;
+    let plaintext = secret::decrypt_secret(&ak, &decoded, name, &env_name, revision.rev_number)
+        .map_err(|e| CliError::Crypto(e.to_string()))?;
 
     if to_stdout {
         print!("{}", String::from_utf8_lossy(&plaintext));

@@ -109,8 +109,8 @@ impl FsBackend {
     fn save_env_meta(&self, app: &str, env: &str, meta: &FsEnvMeta) -> Result<(), BackendError> {
         let dir = self.env_dir(app, env);
         fs::create_dir_all(&dir)?;
-        let data = serde_json::to_string_pretty(meta)
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+        let data =
+            serde_json::to_string_pretty(meta).map_err(|e| BackendError::Other(e.to_string()))?;
         fs::write(self.env_meta_path(app, env), data)?;
         Ok(())
     }
@@ -127,8 +127,8 @@ impl FsBackend {
     fn save_revision(&self, app: &str, env: &str, rev: &FsRevision) -> Result<(), BackendError> {
         let dir = self.revisions_dir(app, env);
         fs::create_dir_all(&dir)?;
-        let data = serde_json::to_string_pretty(rev)
-            .map_err(|e| BackendError::Other(e.to_string()))?;
+        let data =
+            serde_json::to_string_pretty(rev).map_err(|e| BackendError::Other(e.to_string()))?;
         fs::write(self.revision_path(app, env, rev.rev_number), data)?;
         Ok(())
     }
@@ -251,7 +251,12 @@ impl Backend for FsBackend {
         Ok(result)
     }
 
-    fn create_env(&self, app: &str, env: &str, copy_from: Option<&str>) -> Result<(), BackendError> {
+    fn create_env(
+        &self,
+        app: &str,
+        env: &str,
+        copy_from: Option<&str>,
+    ) -> Result<(), BackendError> {
         if !self.app_dir(app).exists() {
             return Err(BackendError::NotFound(format!("app '{app}'")));
         }
@@ -277,18 +282,26 @@ impl Backend for FsBackend {
                     rollback_of: None,
                 };
                 self.save_revision(app, env, &new_rev)?;
-                self.save_env_meta(app, env, &FsEnvMeta {
-                    latest_rev: 1,
-                    updated_at: Self::now_iso(),
-                })?;
+                self.save_env_meta(
+                    app,
+                    env,
+                    &FsEnvMeta {
+                        latest_rev: 1,
+                        updated_at: Self::now_iso(),
+                    },
+                )?;
                 return Ok(());
             }
         }
 
-        self.save_env_meta(app, env, &FsEnvMeta {
-            latest_rev: 0,
-            updated_at: Self::now_iso(),
-        })?;
+        self.save_env_meta(
+            app,
+            env,
+            &FsEnvMeta {
+                latest_rev: 0,
+                updated_at: Self::now_iso(),
+            },
+        )?;
         Ok(())
     }
 
@@ -325,14 +338,22 @@ impl Backend for FsBackend {
             content_hash: None, // kept locally per spec
             created_at: now.clone(),
             device_id: "local".into(),
-            parent_rev: if parent_rev > 0 { Some(parent_rev) } else { None },
+            parent_rev: if parent_rev > 0 {
+                Some(parent_rev)
+            } else {
+                None
+            },
             rollback_of: None,
         };
         self.save_revision(app, env, &rev)?;
-        self.save_env_meta(app, env, &FsEnvMeta {
-            latest_rev: new_rev_number,
-            updated_at: now.clone(),
-        })?;
+        self.save_env_meta(
+            app,
+            env,
+            &FsEnvMeta {
+                latest_rev: new_rev_number,
+                updated_at: now.clone(),
+            },
+        )?;
 
         Ok(RevisionMeta {
             rev_number: new_rev_number,
@@ -343,17 +364,14 @@ impl Backend for FsBackend {
         })
     }
 
-    fn pull_revision(
-        &self,
-        app: &str,
-        env: &str,
-        rev: &RevSpec,
-    ) -> Result<Revision, BackendError> {
+    fn pull_revision(&self, app: &str, env: &str, rev: &RevSpec) -> Result<Revision, BackendError> {
         let rev_number = match rev {
             RevSpec::Latest => {
                 let meta = self.load_env_meta(app, env)?;
                 if meta.latest_rev == 0 {
-                    return Err(BackendError::NotFound(format!("no revisions in {app}/{env}")));
+                    return Err(BackendError::NotFound(format!(
+                        "no revisions in {app}/{env}"
+                    )));
                 }
                 meta.latest_rev
             }
@@ -416,10 +434,14 @@ impl Backend for FsBackend {
             rollback_of: Some(to_rev),
         };
         self.save_revision(app, env, &rev)?;
-        self.save_env_meta(app, env, &FsEnvMeta {
-            latest_rev: new_rev_number,
-            updated_at: now.clone(),
-        })?;
+        self.save_env_meta(
+            app,
+            env,
+            &FsEnvMeta {
+                latest_rev: new_rev_number,
+                updated_at: now.clone(),
+            },
+        )?;
 
         Ok(RevisionMeta {
             rev_number: new_rev_number,
@@ -443,6 +465,8 @@ fn uuid_v4() -> String {
         u16::from_be_bytes([bytes[4], bytes[5]]),
         u16::from_be_bytes([bytes[6], bytes[7]]),
         u16::from_be_bytes([bytes[8], bytes[9]]),
-        u64::from_be_bytes([0, 0, bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]])
+        u64::from_be_bytes([
+            0, 0, bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ])
     )
 }

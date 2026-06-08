@@ -59,7 +59,9 @@ fn full_cycle_init_push_pull() {
     assert_eq!(meta.rev_number, 1);
 
     // Pull revision 1
-    let rev = backend.pull_revision("myapp", "dev", &RevSpec::Latest).unwrap();
+    let rev = backend
+        .pull_revision("myapp", "dev", &RevSpec::Latest)
+        .unwrap();
     assert_eq!(rev.rev_number, 1);
     let decoded = blob::decode_blob(&rev.blob).unwrap();
     let decrypted = secret::decrypt_secret(&ak, &decoded, "myapp", "dev", 1).unwrap();
@@ -78,7 +80,9 @@ fn multiple_revisions_and_history() {
         let data = format!("KEY=value{i}\n");
         let encrypted = secret::encrypt_secret(&ak, data.as_bytes(), "app2", "dev", i).unwrap();
         let blob_str = blob::encode_blob(&encrypted);
-        backend.push_revision("app2", "dev", &blob_str, i - 1).unwrap();
+        backend
+            .push_revision("app2", "dev", &blob_str, i - 1)
+            .unwrap();
     }
 
     // History should show 3 revisions (newest first)
@@ -88,7 +92,9 @@ fn multiple_revisions_and_history() {
     assert_eq!(history[2].rev_number, 1);
 
     // Pull specific revision
-    let rev2 = backend.pull_revision("app2", "dev", &RevSpec::Number(2)).unwrap();
+    let rev2 = backend
+        .pull_revision("app2", "dev", &RevSpec::Number(2))
+        .unwrap();
     let decoded = blob::decode_blob(&rev2.blob).unwrap();
     let decrypted = secret::decrypt_secret(&ak, &decoded, "app2", "dev", 2).unwrap();
     assert_eq!(String::from_utf8(decrypted).unwrap(), "KEY=value2\n");
@@ -103,7 +109,9 @@ fn push_conflict_detection() {
 
     // Push rev 1
     let encrypted = secret::encrypt_secret(&ak, b"V=1", "conflict", "dev", 1).unwrap();
-    backend.push_revision("conflict", "dev", &blob::encode_blob(&encrypted), 0).unwrap();
+    backend
+        .push_revision("conflict", "dev", &blob::encode_blob(&encrypted), 0)
+        .unwrap();
 
     // Try to push with stale parent_rev=0 → conflict
     let encrypted2 = secret::encrypt_secret(&ak, b"V=2", "conflict", "dev", 2).unwrap();
@@ -122,7 +130,9 @@ fn rollback_creates_new_revision() {
     for i in 1..=2 {
         let data = format!("V={i}\n");
         let encrypted = secret::encrypt_secret(&ak, data.as_bytes(), "rollback", "dev", i).unwrap();
-        backend.push_revision("rollback", "dev", &blob::encode_blob(&encrypted), i - 1).unwrap();
+        backend
+            .push_revision("rollback", "dev", &blob::encode_blob(&encrypted), i - 1)
+            .unwrap();
     }
 
     // Rollback to rev 1
@@ -131,8 +141,12 @@ fn rollback_creates_new_revision() {
     assert_eq!(meta.rollback_of, Some(1));
 
     // Rev 3 should have same blob as rev 1
-    let rev3 = backend.pull_revision("rollback", "dev", &RevSpec::Number(3)).unwrap();
-    let rev1 = backend.pull_revision("rollback", "dev", &RevSpec::Number(1)).unwrap();
+    let rev3 = backend
+        .pull_revision("rollback", "dev", &RevSpec::Number(3))
+        .unwrap();
+    let rev1 = backend
+        .pull_revision("rollback", "dev", &RevSpec::Number(1))
+        .unwrap();
     assert_eq!(rev3.blob, rev1.blob);
 }
 
@@ -146,11 +160,15 @@ fn environments_independent_chains() {
 
     // Push to dev
     let enc_dev = secret::encrypt_secret(&ak, b"ENV=dev\n", "envtest", "dev", 1).unwrap();
-    backend.push_revision("envtest", "dev", &blob::encode_blob(&enc_dev), 0).unwrap();
+    backend
+        .push_revision("envtest", "dev", &blob::encode_blob(&enc_dev), 0)
+        .unwrap();
 
     // Push to prod
     let enc_prod = secret::encrypt_secret(&ak, b"ENV=prod\n", "envtest", "prod", 1).unwrap();
-    backend.push_revision("envtest", "prod", &blob::encode_blob(&enc_prod), 0).unwrap();
+    backend
+        .push_revision("envtest", "prod", &blob::encode_blob(&enc_prod), 0)
+        .unwrap();
 
     // Dev and prod have independent rev chains
     let envs = backend.list_envs("envtest").unwrap();
@@ -160,10 +178,15 @@ fn environments_independent_chains() {
     }
 
     // Cross-env AAD check: prod blob can't be decrypted with dev AAD
-    let prod_rev = backend.pull_revision("envtest", "prod", &RevSpec::Latest).unwrap();
+    let prod_rev = backend
+        .pull_revision("envtest", "prod", &RevSpec::Latest)
+        .unwrap();
     let prod_decoded = blob::decode_blob(&prod_rev.blob).unwrap();
     let cross_result = secret::decrypt_secret(&ak, &prod_decoded, "envtest", "dev", 1);
-    assert!(cross_result.is_err(), "cross-env decryption should fail due to AAD");
+    assert!(
+        cross_result.is_err(),
+        "cross-env decryption should fail due to AAD"
+    );
 }
 
 #[test]
@@ -185,7 +208,10 @@ fn account_keys_roundtrip() {
     let mk = kdf::derive_master_key_with_params(b"test-password", &salt_bytes, &params).unwrap();
     let nonce: [u8; 24] = B64.decode(&keys.nonce_ak).unwrap().try_into().unwrap();
     let ct = B64.decode(&keys.wrapped_ak).unwrap();
-    let wrapped = envelope::WrappedAk { nonce, ciphertext: ct };
+    let wrapped = envelope::WrappedAk {
+        nonce,
+        ciphertext: ct,
+    };
     let unwrapped = envelope::unwrap_ak(&mk, &wrapped).unwrap();
     // AK should be 32 non-zero bytes
     assert_ne!(*unwrapped, [0u8; 32]);
@@ -200,10 +226,14 @@ fn app_list_and_env_copy() {
 
     // Push to dev
     let enc = secret::encrypt_secret(&ak, b"DATA=hello\n", "copytest", "dev", 1).unwrap();
-    backend.push_revision("copytest", "dev", &blob::encode_blob(&enc), 0).unwrap();
+    backend
+        .push_revision("copytest", "dev", &blob::encode_blob(&enc), 0)
+        .unwrap();
 
     // Copy dev → staging
-    backend.create_env("copytest", "staging", Some("dev")).unwrap();
+    backend
+        .create_env("copytest", "staging", Some("dev"))
+        .unwrap();
 
     let envs = backend.list_envs("copytest").unwrap();
     assert_eq!(envs.len(), 2);
@@ -250,13 +280,18 @@ fn account_init_once_only() {
     let req = AccountInitReq {
         salt: B64.encode([0u8; 16]),
         argon_params: ArgonParamsDto {
-            memory: 65536, iterations: 3, parallelism: 1, version: 19,
+            memory: 65536,
+            iterations: 3,
+            parallelism: 1,
+            version: 19,
         },
         nonce_ak: B64.encode([0u8; 24]),
         wrapped_ak: B64.encode([0u8; 48]),
         device_name: "second".into(),
         bootstrap_secret: String::new(),
-        salt_rc: None, nonce_rc: None, wrapped_ak_rc: None,
+        salt_rc: None,
+        nonce_rc: None,
+        wrapped_ak_rc: None,
     };
     assert!(backend.account_init(&req).is_err()); // solo mode — one account
 }

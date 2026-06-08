@@ -17,7 +17,8 @@ pub trait Backend {
 
     // --- Environments ---
     fn list_envs(&self, app: &str) -> Result<Vec<EnvInfo>, BackendError>;
-    fn create_env(&self, app: &str, env: &str, copy_from: Option<&str>) -> Result<(), BackendError>;
+    fn create_env(&self, app: &str, env: &str, copy_from: Option<&str>)
+        -> Result<(), BackendError>;
     fn delete_env(&self, app: &str, env: &str) -> Result<(), BackendError>;
 
     // --- Revisions ---
@@ -29,12 +30,7 @@ pub trait Backend {
         parent_rev: u64,
     ) -> Result<RevisionMeta, BackendError>;
 
-    fn pull_revision(
-        &self,
-        app: &str,
-        env: &str,
-        rev: &RevSpec,
-    ) -> Result<Revision, BackendError>;
+    fn pull_revision(&self, app: &str, env: &str, rev: &RevSpec) -> Result<Revision, BackendError>;
 
     fn list_revisions(&self, app: &str, env: &str) -> Result<Vec<RevisionMeta>, BackendError>;
 

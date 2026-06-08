@@ -34,12 +34,14 @@ pub fn run(ctx: &mut Context, name: &str, file: &str) -> Result<(), CliError> {
 
     // Check if content is identical to latest
     if parent_rev > 0 {
-        let latest = ctx.backend.pull_revision(name, &env_name, &RevSpec::Latest)?;
-        let decoded = blob::decode_blob(&latest.blob)
-            .map_err(|e| CliError::Crypto(e.to_string()))?;
-        if let Ok(prev_plaintext) = secret::decrypt_secret(
-            &ak, &decoded, name, &env_name, latest.rev_number,
-        ) {
+        let latest = ctx
+            .backend
+            .pull_revision(name, &env_name, &RevSpec::Latest)?;
+        let decoded =
+            blob::decode_blob(&latest.blob).map_err(|e| CliError::Crypto(e.to_string()))?;
+        if let Ok(prev_plaintext) =
+            secret::decrypt_secret(&ak, &decoded, name, &env_name, latest.rev_number)
+        {
             if prev_plaintext == plaintext {
                 ctx.print(&format!("nothing to push (identical to rev {parent_rev})"));
                 return Ok(());
@@ -52,10 +54,15 @@ pub fn run(ctx: &mut Context, name: &str, file: &str) -> Result<(), CliError> {
         .map_err(|e| CliError::Crypto(e.to_string()))?;
     let blob_str = blob::encode_blob(&encrypted);
 
-    let meta = ctx.backend.push_revision(name, &env_name, &blob_str, parent_rev)?;
+    let meta = ctx
+        .backend
+        .push_revision(name, &env_name, &blob_str, parent_rev)?;
 
     let key_count = count_env_keys(&plaintext);
-    ctx.print(&format!("Pushed revision {} ({key_count} keys).", meta.rev_number));
+    ctx.print(&format!(
+        "Pushed revision {} ({key_count} keys).",
+        meta.rev_number
+    ));
     Ok(())
 }
 

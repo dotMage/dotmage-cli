@@ -86,9 +86,7 @@ impl Config {
 
     /// Resolve the server identifier for keychain.
     pub fn server_id(&self) -> String {
-        self.server_url
-            .clone()
-            .unwrap_or_else(|| "local".into())
+        self.server_url.clone().unwrap_or_else(|| "local".into())
     }
 
     /// Check if an environment name is protected (prod-guard).

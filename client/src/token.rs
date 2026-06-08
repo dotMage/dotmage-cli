@@ -27,13 +27,15 @@ fn store_path() -> PathBuf {
 
 pub fn save_tokens(server_hash: &str, tokens: &ServerTokens) -> Result<(), TokenError> {
     let mut store = load_store()?;
-    store.servers.insert(server_hash.to_string(), tokens.clone());
+    store
+        .servers
+        .insert(server_hash.to_string(), tokens.clone());
     let path = store_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let data = serde_json::to_string_pretty(&store)
-        .map_err(|e| TokenError::Other(e.to_string()))?;
+    let data =
+        serde_json::to_string_pretty(&store).map_err(|e| TokenError::Other(e.to_string()))?;
     std::fs::write(path, data)?;
     Ok(())
 }
@@ -48,8 +50,8 @@ pub fn delete_tokens(server_hash: &str) -> Result<(), TokenError> {
     store.servers.remove(server_hash);
     let path = store_path();
     if path.exists() {
-        let data = serde_json::to_string_pretty(&store)
-            .map_err(|e| TokenError::Other(e.to_string()))?;
+        let data =
+            serde_json::to_string_pretty(&store).map_err(|e| TokenError::Other(e.to_string()))?;
         std::fs::write(path, data)?;
     }
     Ok(())

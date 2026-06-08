@@ -11,8 +11,8 @@ use dotmage_crypto::secret;
 fn argon2id_golden_vector() {
     let password = b"correct-horse-battery-staple";
     let salt: [u8; 16] = [
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+        0x0f,
     ];
 
     let mk1 = kdf::derive_master_key(password, &salt).expect("kdf failed");
@@ -48,10 +48,10 @@ fn encrypt_decrypt_roundtrip() {
     let ak = [0x42_u8; 32];
     let plaintext = b"DATABASE_URL=postgres://localhost\nSECRET_KEY=hunter2\n";
 
-    let encrypted = secret::encrypt_secret(&ak, plaintext, "myapp", "dev", 1)
-        .expect("encrypt failed");
-    let decrypted = secret::decrypt_secret(&ak, &encrypted, "myapp", "dev", 1)
-        .expect("decrypt failed");
+    let encrypted =
+        secret::encrypt_secret(&ak, plaintext, "myapp", "dev", 1).expect("encrypt failed");
+    let decrypted =
+        secret::decrypt_secret(&ak, &encrypted, "myapp", "dev", 1).expect("decrypt failed");
 
     assert_eq!(decrypted, plaintext);
 }
@@ -62,14 +62,17 @@ fn tampered_ciphertext_fails() {
     let ak = [0x42_u8; 32];
     let plaintext = b"SECRET=value";
 
-    let mut encrypted = secret::encrypt_secret(&ak, plaintext, "app", "dev", 1)
-        .expect("encrypt failed");
+    let mut encrypted =
+        secret::encrypt_secret(&ak, plaintext, "app", "dev", 1).expect("encrypt failed");
 
     // Flip one byte in ciphertext.
     encrypted.ciphertext[0] ^= 0xff;
 
     let result = secret::decrypt_secret(&ak, &encrypted, "app", "dev", 1);
-    assert!(result.is_err(), "decrypt should fail on tampered ciphertext");
+    assert!(
+        result.is_err(),
+        "decrypt should fail on tampered ciphertext"
+    );
 }
 
 /// A.8.4: Swapping AAD (different app_name or rev) → decrypt fails.
@@ -78,8 +81,8 @@ fn wrong_aad_app_name_fails() {
     let ak = [0x42_u8; 32];
     let plaintext = b"KEY=value";
 
-    let encrypted = secret::encrypt_secret(&ak, plaintext, "app-a", "dev", 1)
-        .expect("encrypt failed");
+    let encrypted =
+        secret::encrypt_secret(&ak, plaintext, "app-a", "dev", 1).expect("encrypt failed");
 
     // Try decrypting with different app name.
     let result = secret::decrypt_secret(&ak, &encrypted, "app-b", "dev", 1);
@@ -91,8 +94,8 @@ fn wrong_aad_env_name_fails() {
     let ak = [0x42_u8; 32];
     let plaintext = b"KEY=value";
 
-    let encrypted = secret::encrypt_secret(&ak, plaintext, "app", "dev", 1)
-        .expect("encrypt failed");
+    let encrypted =
+        secret::encrypt_secret(&ak, plaintext, "app", "dev", 1).expect("encrypt failed");
 
     // Try decrypting with different env name.
     let result = secret::decrypt_secret(&ak, &encrypted, "app", "prod", 1);
@@ -104,8 +107,8 @@ fn wrong_aad_rev_number_fails() {
     let ak = [0x42_u8; 32];
     let plaintext = b"KEY=value";
 
-    let encrypted = secret::encrypt_secret(&ak, plaintext, "app", "dev", 1)
-        .expect("encrypt failed");
+    let encrypted =
+        secret::encrypt_secret(&ak, plaintext, "app", "dev", 1).expect("encrypt failed");
 
     // Try decrypting with different rev number.
     let result = secret::decrypt_secret(&ak, &encrypted, "app", "dev", 2);
@@ -122,7 +125,10 @@ fn different_nonce_each_encryption() {
     let enc2 = secret::encrypt_secret(&ak, plaintext, "app", "dev", 1).unwrap();
 
     assert_ne!(enc1.nonce, enc2.nonce, "nonces should differ");
-    assert_ne!(enc1.ciphertext, enc2.ciphertext, "ciphertexts should differ");
+    assert_ne!(
+        enc1.ciphertext, enc2.ciphertext,
+        "ciphertexts should differ"
+    );
 }
 
 /// A.8.6: MK decrypts wrapped AK; wrong password → AEAD error, not garbage.
@@ -149,7 +155,10 @@ fn envelope_wrong_password_fails() {
     let wrapped = envelope::wrap_ak(&mk_correct, &ak).unwrap();
 
     let result = envelope::unwrap_ak(&mk_wrong, &wrapped);
-    assert!(result.is_err(), "unwrap with wrong password should fail cleanly");
+    assert!(
+        result.is_err(),
+        "unwrap with wrong password should fail cleanly"
+    );
 }
 
 /// A.8.7: Unknown blob version → explicit error.

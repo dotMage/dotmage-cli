@@ -17,7 +17,10 @@ pub fn run(ctx: &Context, name: &str) -> Result<(), CliError> {
             .rollback_of
             .map(|r| format!("rollback of {r}"))
             .unwrap_or_default();
-        println!("{:<5} {:<22} {:<12} {}", rev.rev_number, when, rev.device_id, note);
+        println!(
+            "{:<5} {:<22} {:<12} {}",
+            rev.rev_number, when, rev.device_id, note
+        );
     }
     Ok(())
 }

@@ -15,7 +15,9 @@ pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Re
     // Save server URL if provided
     if let Some(url) = &server {
         ctx.config.server_url = Some(url.clone());
-        ctx.config.save().map_err(|e| CliError::Config(e.to_string()))?;
+        ctx.config
+            .save()
+            .map_err(|e| CliError::Config(e.to_string()))?;
     }
 
     let ttl_secs = parse_ttl(ttl.as_deref()).unwrap_or(ctx.config.key_ttl_secs);
@@ -31,8 +33,12 @@ pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Re
 
     let password = prompt_password("Master password: ")?;
 
-    let salt = B64.decode(&keys.salt).map_err(|e| CliError::Crypto(e.to_string()))?;
-    let salt: [u8; 16] = salt.try_into().map_err(|_| CliError::Crypto("invalid salt".into()))?;
+    let salt = B64
+        .decode(&keys.salt)
+        .map_err(|e| CliError::Crypto(e.to_string()))?;
+    let salt: [u8; 16] = salt
+        .try_into()
+        .map_err(|_| CliError::Crypto("invalid salt".into()))?;
 
     let params = kdf::ArgonParams {
         memory: keys.argon_params.memory,
@@ -44,9 +50,15 @@ pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Re
     let mk = kdf::derive_master_key_with_params(password.as_bytes(), &salt, &params)
         .map_err(|e| CliError::Crypto(e.to_string()))?;
 
-    let nonce_ak = B64.decode(&keys.nonce_ak).map_err(|e| CliError::Crypto(e.to_string()))?;
-    let nonce_ak: [u8; 24] = nonce_ak.try_into().map_err(|_| CliError::Crypto("invalid nonce".into()))?;
-    let wrapped_ct = B64.decode(&keys.wrapped_ak).map_err(|e| CliError::Crypto(e.to_string()))?;
+    let nonce_ak = B64
+        .decode(&keys.nonce_ak)
+        .map_err(|e| CliError::Crypto(e.to_string()))?;
+    let nonce_ak: [u8; 24] = nonce_ak
+        .try_into()
+        .map_err(|_| CliError::Crypto("invalid nonce".into()))?;
+    let wrapped_ct = B64
+        .decode(&keys.wrapped_ak)
+        .map_err(|e| CliError::Crypto(e.to_string()))?;
 
     let wrapped = envelope::WrappedAk {
         nonce: nonce_ak,
@@ -62,7 +74,9 @@ pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Re
         .map_err(|e| CliError::Keychain(e.to_string()))?;
 
     let days = ttl_secs / 86400;
-    ctx.print(&format!("Authenticated. Key cached in keychain (expires in {days}d)."));
+    ctx.print(&format!(
+        "Authenticated. Key cached in keychain (expires in {days}d)."
+    ));
     Ok(())
 }
 
@@ -88,8 +102,7 @@ fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
         .map_err(|e| CliError::Crypto(e.to_string()))?;
 
     let ak = envelope::generate_account_key();
-    let wrapped = envelope::wrap_ak(&mk, &ak)
-        .map_err(|e| CliError::Crypto(e.to_string()))?;
+    let wrapped = envelope::wrap_ak(&mk, &ak).map_err(|e| CliError::Crypto(e.to_string()))?;
 
     let device_name = hostname();
 
@@ -129,7 +142,9 @@ fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
         .map_err(|e| CliError::Keychain(e.to_string()))?;
 
     let days = ttl_secs / 86400;
-    ctx.print(&format!("Account created. Key cached in keychain (expires in {days}d)."));
+    ctx.print(&format!(
+        "Account created. Key cached in keychain (expires in {days}d)."
+    ));
     Ok(())
 }
 

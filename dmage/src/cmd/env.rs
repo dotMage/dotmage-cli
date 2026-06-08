@@ -28,7 +28,11 @@ pub fn run(ctx: &Context, action: Option<EnvCmd>) -> Result<(), CliError> {
                     "{:<12} rev {:<6} {}{}",
                     env.name,
                     env.latest_rev,
-                    if env.updated_at.is_empty() { "-" } else { &env.updated_at[..std::cmp::min(19, env.updated_at.len())] },
+                    if env.updated_at.is_empty() {
+                        "-"
+                    } else {
+                        &env.updated_at[..std::cmp::min(19, env.updated_at.len())]
+                    },
                     marker,
                 );
             }

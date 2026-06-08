@@ -9,8 +9,7 @@ const NONCE_LEN: usize = 24;
 /// Build the AAD string per spec A.4:
 /// `"dotmage-secret-v1|{app_name}|{env_name}|{rev_number}"`
 pub fn build_aad(app_name: &str, env_name: &str, rev_number: u64) -> Vec<u8> {
-    format!("dotmage-secret-v1|{app_name}|{env_name}|{rev_number}")
-        .into_bytes()
+    format!("dotmage-secret-v1|{app_name}|{env_name}|{rev_number}").into_bytes()
 }
 
 /// Encrypted secret: nonce + ciphertext.
