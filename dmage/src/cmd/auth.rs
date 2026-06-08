@@ -74,14 +74,12 @@ pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Re
         .map_err(|e| CliError::Keychain(e.to_string()))?;
 
     let days = ttl_secs / 86400;
-    ctx.print(&format!(
-        "Authenticated. Key cached in keychain (expires in {days}d)."
-    ));
+    ctx.success(&format!("Authenticated. Key cached (expires in {days}d)."));
     Ok(())
 }
 
 fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
-    ctx.print("No account found. Creating new account...");
+    println!("\n  \x1b[36mNo account found — creating new account\x1b[0m\n");
 
     let password = prompt_password("New master password: ")?;
     let password_confirm = prompt_password("Confirm master password: ")?;
@@ -142,8 +140,8 @@ fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
         .map_err(|e| CliError::Keychain(e.to_string()))?;
 
     let days = ttl_secs / 86400;
-    ctx.print(&format!(
-        "Account created. Key cached in keychain (expires in {days}d)."
+    ctx.success(&format!(
+        "Account created. Key cached (expires in {days}d)."
     ));
     Ok(())
 }
@@ -167,5 +165,22 @@ fn parse_ttl(s: Option<&str>) -> Option<u64> {
 fn hostname() -> String {
     std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
+        .or_else(|_| {
+            // macOS/Linux: read from syscall
+            let mut buf = [0u8; 256];
+            #[cfg(unix)]
+            {
+                use std::ffi::CStr;
+                unsafe {
+                    if libc::gethostname(buf.as_mut_ptr() as *mut _, buf.len()) == 0 {
+                        if let Ok(s) = CStr::from_ptr(buf.as_ptr() as *const _).to_str() {
+                            return Ok(s.to_string());
+                        }
+                    }
+                }
+            }
+            let _ = buf;
+            Err(std::env::VarError::NotPresent)
+        })
         .unwrap_or_else(|_| "unknown".into())
 }

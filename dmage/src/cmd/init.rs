@@ -36,8 +36,8 @@ pub fn run(ctx: &mut Context, name: &str, file: &str) -> Result<(), CliError> {
     ctx.backend
         .push_revision(name, &ctx.active_env, &blob_str, 0)?;
 
-    ctx.print(&format!(
-        "Created app '{name}'. Pushed revision 1 from {file} ({key_count} keys)."
+    ctx.success(&format!(
+        "Created app '\x1b[1m{name}\x1b[0m'. Pushed revision 1 from {file} ({key_count} keys)."
     ));
     Ok(())
 }

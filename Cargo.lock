@@ -358,6 +358,7 @@ dependencies = [
  "dotmage-client",
  "dotmage-crypto",
  "hex",
+ "libc",
  "rpassword",
  "sha2",
  "thiserror",

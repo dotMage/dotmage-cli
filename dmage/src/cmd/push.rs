@@ -59,7 +59,7 @@ pub fn run(ctx: &mut Context, name: &str, file: &str) -> Result<(), CliError> {
         .push_revision(name, &env_name, &blob_str, parent_rev)?;
 
     let key_count = count_env_keys(&plaintext);
-    ctx.print(&format!(
+    ctx.success(&format!(
         "Pushed revision {} ({key_count} keys).",
         meta.rev_number
     ));

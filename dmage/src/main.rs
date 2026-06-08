@@ -9,11 +9,12 @@ mod cmd;
 #[command(
     name = "dmage",
     version,
-    about = "dotMage — E2E-encrypted .env secret manager"
+    about = "dotMage — E2E-encrypted .env secret manager",
+    disable_help_subcommand = true
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 
     /// Override the active environment.
     #[arg(long, global = true)]
@@ -75,12 +76,12 @@ enum Commands {
         #[arg(long)]
         force: bool,
     },
-    /// Execute a command with secrets in the environment (no disk write).
+    /// Run a command with secrets injected (e.g., dmage exec myapp npm dev).
     Exec {
         /// Application name.
         name: String,
-        /// Command and arguments.
-        #[arg(last = true)]
+        /// Command and arguments (no -- needed).
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         command: Vec<String>,
     },
     /// Show diff between local and remote.
@@ -110,10 +111,12 @@ enum Commands {
     Token,
     /// Show sync status.
     Status,
-    /// Remove AK from keychain (keep device token).
+    /// Remove cached key (keep device token).
     Lock,
-    /// Remove AK and device token (full logout).
+    /// Full logout (key + tokens + local data).
     Logout,
+    /// Wipe all local dotMage data from this device.
+    Clean,
     /// Generate enrollment/CI token.
     GenToken {
         /// Token name.
@@ -128,6 +131,8 @@ enum Commands {
         #[command(subcommand)]
         action: Option<EnvAction>,
     },
+    /// Show help.
+    Help,
 }
 
 #[derive(Subcommand)]
@@ -161,20 +166,35 @@ enum EnvAction {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+
+    if cli.command.is_none() {
+        print_banner();
+        return ExitCode::SUCCESS;
+    }
+
     let result = run(cli);
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("\x1b[31m  error:\x1b[0m {e}");
             e.exit_code()
         }
     }
 }
 
 fn run(cli: Cli) -> Result<(), cmd::CliError> {
+    let command = cli.command.unwrap();
+
+    if matches!(command, Commands::Help) {
+        use clap::CommandFactory;
+        Cli::command().print_help().ok();
+        println!();
+        return Ok(());
+    }
+
     let mut ctx = cmd::Context::load(cli.env, cli.quiet, cli.json)?;
 
-    match cli.command {
+    match command {
         Commands::Auth { server, ttl, .. } => cmd::auth::run(&mut ctx, server, ttl),
         Commands::Init { name, file } => cmd::init::run(&mut ctx, &name, &file),
         Commands::Push { name, file } => cmd::push::run(&mut ctx, &name, &file),
@@ -201,6 +221,7 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
         Commands::Status => cmd::status::run(&ctx),
         Commands::Lock => cmd::lock::run(&ctx),
         Commands::Logout => cmd::lock::run_logout(&ctx),
+        Commands::Clean => cmd::clean::run(&ctx),
         Commands::GenToken { name, ttl } => cmd::gen_token::run(&ctx, name.as_deref(), &ttl),
         Commands::Env { action } => cmd::env::run(
             &ctx,
@@ -214,5 +235,44 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
                 EnvAction::Rm { app, name, yes } => cmd::env::EnvCmd::Rm(app, name, yes),
             }),
         ),
+        Commands::Help => unreachable!(),
     }
+}
+
+fn print_banner() {
+    let version = env!("CARGO_PKG_VERSION");
+    println!("\x1b[36m");
+    println!("      ·  dotMage  ·");
+    println!("\x1b[0m");
+    println!("  E2E-encrypted .env manager  v{version}");
+    println!();
+
+    // Show connection status
+    let config = dotmage_client::config::Config::load().unwrap_or_default();
+    if let Some(ref url) = config.server_url {
+        let hash = dotmage_client::keychain::server_hash(url);
+        let has_ak = dotmage_client::keychain::load_ak(&hash)
+            .ok()
+            .flatten()
+            .is_some();
+        let has_token = dotmage_client::token::load_tokens(&hash)
+            .ok()
+            .flatten()
+            .is_some();
+
+        println!("  server   \x1b[90m{url}\x1b[0m");
+        if has_ak {
+            println!("  auth     \x1b[32m● authenticated\x1b[0m");
+        } else if has_token {
+            println!("  auth     \x1b[33m● token saved, run: dmage auth\x1b[0m");
+        } else {
+            println!("  auth     \x1b[31m● not connected\x1b[0m");
+        }
+    } else {
+        println!("  server   \x1b[90m(local mode)\x1b[0m");
+    }
+
+    println!();
+    println!("  \x1b[90mRun \x1b[0mdmage help\x1b[90m for commands\x1b[0m");
+    println!();
 }

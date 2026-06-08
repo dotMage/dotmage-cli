@@ -2,6 +2,7 @@
 
 pub mod apps;
 pub mod auth;
+pub mod clean;
 pub mod diff;
 pub mod env;
 pub mod exec;
@@ -83,7 +84,13 @@ impl Context {
 
     pub fn print(&self, msg: &str) {
         if !self.quiet {
-            println!("{msg}");
+            println!("  {msg}");
+        }
+    }
+
+    pub fn success(&self, msg: &str) {
+        if !self.quiet {
+            println!("  \x1b[32m✓\x1b[0m {msg}");
         }
     }
 }

@@ -59,7 +59,7 @@ pub fn run(
     std::fs::write(path, &plaintext)?;
 
     let key_count = count_env_keys(&plaintext);
-    ctx.print(&format!(
+    ctx.success(&format!(
         "Wrote {out_path} from revision {} ({key_count} keys).",
         revision.rev_number
     ));
