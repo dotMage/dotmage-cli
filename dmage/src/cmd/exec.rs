@@ -8,7 +8,10 @@ use super::{CliError, Context};
 
 pub fn run(ctx: &mut Context, name: &str, command: &[String]) -> Result<(), CliError> {
     if command.is_empty() {
-        return Err(CliError::Other("no command specified after --".into()));
+        return Err(CliError::Other(
+            "usage: dmage exec <app> <command...>\n         example: dmage exec myapp npm run dev"
+                .into(),
+        ));
     }
 
     let ak = ctx.require_ak()?;
