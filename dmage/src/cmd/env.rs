@@ -21,7 +21,7 @@ pub fn run(ctx: &Context, action: Option<EnvCmd>) -> Result<(), CliError> {
                 ctx.print("no environments");
                 return Ok(());
             }
-            println!("{:<12} {:<10} {}", "NAME", "LATEST", "UPDATED");
+            println!("{:<12} {:<10} UPDATED", "NAME", "LATEST");
             for env in &envs {
                 let marker = if env.name == ctx.active_env { " *" } else { "" };
                 println!(

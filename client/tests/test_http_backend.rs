@@ -48,14 +48,17 @@ impl ServerGuard {
             .spawn()
             .expect("Failed to start server (is dotmage-server/.venv set up?)");
 
+        let guard = Self { child, port };
+
         // Wait for server to be ready
         let base = format!("http://127.0.0.1:{port}");
         for _ in 0..50 {
             std::thread::sleep(std::time::Duration::from_millis(100));
             if reqwest::blocking::get(format!("{base}/health")).is_ok() {
-                return Self { child, port };
+                return guard;
             }
         }
+        drop(guard);
         panic!("Server did not start within 5 seconds");
     }
 

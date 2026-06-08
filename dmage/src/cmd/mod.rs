@@ -27,6 +27,7 @@ pub struct Context {
     pub backend: Box<dyn Backend>,
     pub active_env: String,
     pub quiet: bool,
+    #[allow(dead_code)]
     pub json: bool,
     /// Cached AK (loaded on demand).
     ak: Option<[u8; 32]>,

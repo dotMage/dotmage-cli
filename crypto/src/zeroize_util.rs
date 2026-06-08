@@ -17,9 +17,8 @@ impl SecureBytes {
     }
 
     pub fn into_inner(mut self) -> Vec<u8> {
-        let inner = std::mem::take(&mut self.0);
         // self will drop with empty vec (zeroize is a no-op on empty)
-        inner
+        std::mem::take(&mut self.0)
     }
 }
 

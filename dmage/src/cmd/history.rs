@@ -10,7 +10,7 @@ pub fn run(ctx: &Context, name: &str) -> Result<(), CliError> {
         return Ok(());
     }
 
-    println!("{:<5} {:<22} {:<12} {}", "REV", "WHEN", "DEVICE", "NOTE");
+    println!("{:<5} {:<22} {:<12} NOTE", "REV", "WHEN", "DEVICE");
     for rev in &revs {
         let when = &rev.created_at[..std::cmp::min(19, rev.created_at.len())];
         let note = rev

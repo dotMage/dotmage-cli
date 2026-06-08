@@ -10,7 +10,7 @@ pub fn run(ctx: &Context) -> Result<(), CliError> {
         return Ok(());
     }
 
-    println!("{:<16} {:<8} {}", "NAME", "ENVS", "UPDATED");
+    println!("{:<16} {:<8} UPDATED", "NAME", "ENVS");
     for app in &apps {
         let updated = if app.updated_at.is_empty() {
             "-".to_string()

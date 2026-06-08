@@ -8,7 +8,6 @@ use dotmage_crypto::{blob, envelope, kdf, secret};
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 fn setup() -> (TempDir, FsBackend, [u8; 32]) {

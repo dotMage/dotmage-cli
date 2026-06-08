@@ -10,7 +10,7 @@ pub fn run(ctx: &Context) -> Result<(), CliError> {
         return Ok(());
     }
 
-    println!("{:<16} {:<8} {:<10} {}", "APP", "ENV", "LATEST", "UPDATED");
+    println!("{:<16} {:<8} {:<10} UPDATED", "APP", "ENV", "LATEST");
     for app in &apps {
         let envs = ctx.backend.list_envs(&app.name)?;
         for env in &envs {

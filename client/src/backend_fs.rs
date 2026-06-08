@@ -413,7 +413,7 @@ impl Backend for FsBackend {
                 });
             }
         }
-        revs.sort_by(|a, b| b.rev_number.cmp(&a.rev_number));
+        revs.sort_by_key(|r| std::cmp::Reverse(r.rev_number));
         Ok(revs)
     }
 
