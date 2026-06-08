@@ -4,6 +4,7 @@ use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 
 use dotmage_client::keychain;
+use dotmage_client::token::{self, ServerTokens};
 use dotmage_client::types::*;
 use dotmage_crypto::envelope;
 use dotmage_crypto::kdf;
@@ -22,7 +23,6 @@ pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Re
     let account_exists = ctx.backend.account_exists()?;
 
     if !account_exists {
-        // Bootstrap: create new account
         return bootstrap(ctx, ttl_secs);
     }
 
@@ -34,7 +34,7 @@ pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Re
     let salt = B64.decode(&keys.salt).map_err(|e| CliError::Crypto(e.to_string()))?;
     let salt: [u8; 16] = salt.try_into().map_err(|_| CliError::Crypto("invalid salt".into()))?;
 
-    let params = dotmage_crypto::kdf::ArgonParams {
+    let params = kdf::ArgonParams {
         memory: keys.argon_params.memory,
         iterations: keys.argon_params.iterations,
         parallelism: keys.argon_params.parallelism,
@@ -75,6 +75,13 @@ fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
         return Err(CliError::Other("passwords do not match".into()));
     }
 
+    // Ask for bootstrap secret if using server
+    let bootstrap_secret = if ctx.config.server_url.is_some() {
+        prompt_password("Bootstrap secret: ")?
+    } else {
+        String::new()
+    };
+
     // Generate crypto material locally
     let salt = kdf::generate_salt();
     let mk = kdf::derive_master_key(password.as_bytes(), &salt)
@@ -96,17 +103,28 @@ fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
         },
         nonce_ak: B64.encode(wrapped.nonce),
         wrapped_ak: B64.encode(&wrapped.ciphertext),
-        device_name,
-        bootstrap_secret: String::new(), // FsBackend doesn't check this
+        device_name: device_name.clone(),
+        bootstrap_secret,
         salt_rc: None,
         nonce_rc: None,
         wrapped_ak_rc: None,
     };
 
-    ctx.backend.account_init(&req)?;
+    let resp = ctx.backend.account_init(&req)?;
+
+    // Store tokens
+    let server_hash = keychain::server_hash(&ctx.config.server_id());
+    token::save_tokens(
+        &server_hash,
+        &ServerTokens {
+            device_token: resp.device_token,
+            refresh_token: resp.refresh_token,
+            device_id: resp.account_id,
+        },
+    )
+    .map_err(|e: token::TokenError| CliError::Other(e.to_string()))?;
 
     // Store AK in keychain
-    let server_hash = keychain::server_hash(&ctx.config.server_id());
     keychain::store_ak(&server_hash, &ak, ttl_secs)
         .map_err(|e| CliError::Keychain(e.to_string()))?;
 
@@ -116,7 +134,7 @@ fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
 }
 
 fn prompt_password(prompt: &str) -> Result<String, CliError> {
-    rpassword::prompt_password(prompt).map_err(|e| CliError::Io(e))
+    rpassword::prompt_password(prompt).map_err(CliError::Io)
 }
 
 fn parse_ttl(s: Option<&str>) -> Option<u64> {

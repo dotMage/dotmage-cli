@@ -15,8 +15,10 @@ pub mod status;
 
 use dotmage_client::backend::Backend;
 use dotmage_client::backend_fs::FsBackend;
+use dotmage_client::backend_http::HttpBackend;
 use dotmage_client::config::Config;
 use dotmage_client::keychain;
+use dotmage_client::token;
 use std::process::ExitCode;
 
 /// Shared context for all commands.
@@ -34,7 +36,20 @@ impl Context {
     pub fn load(env_override: Option<String>, quiet: bool, json: bool) -> Result<Self, CliError> {
         let config = Config::load().map_err(|e| CliError::Config(e.to_string()))?;
         let active_env = env_override.unwrap_or_else(|| config.active_env.clone());
-        let backend = Box::new(FsBackend::new(config.fs_root()));
+
+        let backend: Box<dyn Backend> = if let Some(ref url) = config.server_url {
+            // HTTP mode — connect to server
+            let server_hash = keychain::server_hash(url);
+            let device_token = token::load_tokens(&server_hash)
+                .ok()
+                .flatten()
+                .map(|t| t.device_token)
+                .unwrap_or_default();
+            Box::new(HttpBackend::new(url, &device_token))
+        } else {
+            // Local mode — FsBackend
+            Box::new(FsBackend::new(config.fs_root()))
+        };
 
         Ok(Self {
             config,
