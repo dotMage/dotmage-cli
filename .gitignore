@@ -1,0 +1,18 @@
+# Rust build artifacts
+/target/
+debug/
+*.pdb
+
+# Dependencies (keep Cargo.lock for the binary crate)
+# Cargo.lock is committed for reproducible builds of the dmage binary.
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

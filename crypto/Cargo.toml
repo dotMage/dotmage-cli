@@ -1,0 +1,12 @@
+[package]
+name = "dotmage-crypto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+rand = "0.8"
+zeroize = { version = "1.7", features = ["derive"] }
+base64 = "0.22"
+thiserror = "2"

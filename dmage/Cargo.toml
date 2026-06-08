@@ -1,0 +1,9 @@
+[package]
+name = "dmage"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dotmage-client = { path = "../client" }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
