@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Resolved dotMage configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Server base URL.
     #[serde(default)]
@@ -24,6 +24,19 @@ pub struct Config {
     /// Path to FsBackend root (for local mode).
     #[serde(default)]
     pub fs_backend_path: Option<String>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            server_url: None,
+            device_name: None,
+            active_env: default_env(),
+            key_ttl_secs: default_ttl(),
+            protected_envs: default_protected(),
+            fs_backend_path: None,
+        }
+    }
 }
 
 fn default_env() -> String {
