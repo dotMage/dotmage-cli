@@ -112,6 +112,15 @@ fn try_store_keyring(server_hash: &str, ak_b64: &str, expiry: u64) -> bool {
         return false;
     }
 
+    // Verify round-trip — some macOS configs silently drop the write
+    match ak_entry.get_password() {
+        Ok(readback) if readback == ak_b64 => {}
+        _ => {
+            let _ = ak_entry.delete_credential();
+            return false;
+        }
+    }
+
     let expiry_entry = match keyring::Entry::new(SERVICE, &expiry_account) {
         Ok(e) => e,
         Err(_) => return false,
