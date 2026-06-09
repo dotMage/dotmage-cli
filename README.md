@@ -1,4 +1,4 @@
-# dotmage-cli
+# dotmage
 
 **dmage** — CLI for [dotMage](https://github.com/dotMage), an E2E-encrypted `.env` secret manager.
 
@@ -6,12 +6,12 @@
 
 ### Download binary
 
-Pre-built binaries for macOS, Linux, and Windows are available on the [Releases](https://github.com/dotMage/dotmage-cli/releases) page.
+Pre-built binaries for macOS, Linux, and Windows are available on the [Releases](https://github.com/dotMage/dotmage/releases) page.
 
 ### Build from source
 
 ```
-cargo install --git https://github.com/dotMage/dotmage-cli.git
+cargo install --git https://github.com/dotMage/dotmage.git
 ```
 
 ## Quick start
