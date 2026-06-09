@@ -166,10 +166,9 @@ fn hostname() -> String {
     std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
         .or_else(|_| {
-            // macOS/Linux: read from syscall
-            let mut buf = [0u8; 256];
             #[cfg(unix)]
             {
+                let mut buf = [0u8; 256];
                 use std::ffi::CStr;
                 unsafe {
                     if libc::gethostname(buf.as_mut_ptr() as *mut _, buf.len()) == 0 {
@@ -179,7 +178,6 @@ fn hostname() -> String {
                     }
                 }
             }
-            let _ = buf;
             Err(std::env::VarError::NotPresent)
         })
         .unwrap_or_else(|_| "unknown".into())
