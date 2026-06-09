@@ -110,7 +110,7 @@ jobs:
           FORMULA
 
           # Push to homebrew tap
-          git clone https://x-access-token:${GH_TOKEN}@github.com/dotMage/homebrew-dotmage.git tap
+          git clone https://x-access-token:${GH_TOKEN}@github.com/dotMage/homebrew.git tap
           cp dotmage.rb tap/Formula/dotmage.rb
           cd tap
           git config user.name "github-actions"

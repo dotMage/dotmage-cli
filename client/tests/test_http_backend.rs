@@ -3,7 +3,7 @@
 //! This test starts a Python uvicorn server as a subprocess and runs
 //! the full push/pull cycle through HttpBackend.
 //!
-//! Requires: dotmage-server virtualenv at ../../dotmage-server/.venv
+//! Requires: server virtualenv at ../../server/.venv
 //! Skip with: cargo test --test test_http_backend -- --ignored
 
 use dotmage_client::backend::Backend;
@@ -15,7 +15,7 @@ use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use std::process::{Child, Command};
 
-const SERVER_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../dotmage-server");
+const SERVER_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../server");
 const BOOTSTRAP_SECRET: &str = "test-integration-secret";
 
 struct ServerGuard {
@@ -46,7 +46,7 @@ impl ServerGuard {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn()
-            .expect("Failed to start server (is dotmage-server/.venv set up?)");
+            .expect("Failed to start server (is server/.venv set up?)");
 
         let guard = Self { child, port };
 
