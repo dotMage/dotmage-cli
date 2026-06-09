@@ -163,22 +163,26 @@ fn parse_ttl(s: Option<&str>) -> Option<u64> {
 }
 
 fn hostname() -> String {
+    #[cfg(unix)]
+    {
+        if let Ok(name) = unix_hostname() {
+            return name;
+        }
+    }
     std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
-        .or_else(|_| {
-            #[cfg(unix)]
-            {
-                let mut buf = [0u8; 256];
-                use std::ffi::CStr;
-                unsafe {
-                    if libc::gethostname(buf.as_mut_ptr() as *mut _, buf.len()) == 0 {
-                        if let Ok(s) = CStr::from_ptr(buf.as_ptr() as *const _).to_str() {
-                            return Ok(s.to_string());
-                        }
-                    }
-                }
-            }
-            Err(std::env::VarError::NotPresent)
-        })
         .unwrap_or_else(|_| "unknown".into())
+}
+
+#[cfg(unix)]
+fn unix_hostname() -> Result<String, ()> {
+    let mut buf = [0u8; 256];
+    unsafe {
+        if libc::gethostname(buf.as_mut_ptr() as *mut _, buf.len()) == 0 {
+            if let Ok(s) = std::ffi::CStr::from_ptr(buf.as_ptr() as *const _).to_str() {
+                return Ok(s.to_string());
+            }
+        }
+    }
+    Err(())
 }
