@@ -11,15 +11,11 @@ use dotmage_crypto::kdf;
 
 use super::{CliError, Context};
 
-pub fn run(ctx: &mut Context, server: Option<String>, ttl: Option<String>) -> Result<(), CliError> {
-    // Save server URL if provided
-    if let Some(url) = &server {
-        ctx.config.server_url = Some(url.clone());
-        ctx.config
-            .save()
-            .map_err(|e| CliError::Config(e.to_string()))?;
-    }
-
+pub fn run(
+    ctx: &mut Context,
+    _server: Option<String>,
+    ttl: Option<String>,
+) -> Result<(), CliError> {
     let ttl_secs = parse_ttl(ttl.as_deref()).unwrap_or(ctx.config.key_ttl_secs);
 
     let account_exists = ctx.backend.account_exists()?;

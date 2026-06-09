@@ -195,7 +195,13 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
     let mut ctx = cmd::Context::load(cli.env, cli.quiet, cli.json)?;
 
     match command {
-        Commands::Auth { server, ttl, .. } => cmd::auth::run(&mut ctx, server, ttl),
+        Commands::Auth { server, ttl, .. } => {
+            // If --server provided, update config and recreate backend BEFORE auth runs
+            if let Some(ref url) = server {
+                ctx.set_server(url)?;
+            }
+            cmd::auth::run(&mut ctx, server, ttl)
+        }
         Commands::Init { name, file } => cmd::init::run(&mut ctx, &name, &file),
         Commands::Push { name, file } => cmd::push::run(&mut ctx, &name, &file),
         Commands::Pull {

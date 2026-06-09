@@ -82,6 +82,23 @@ impl Context {
         }
     }
 
+    /// Switch to server mode: save URL, recreate backend.
+    pub fn set_server(&mut self, url: &str) -> Result<(), CliError> {
+        self.config.server_url = Some(url.to_string());
+        self.config
+            .save()
+            .map_err(|e| CliError::Config(e.to_string()))?;
+
+        let server_hash = keychain::server_hash(url);
+        let device_token = token::load_tokens(&server_hash)
+            .ok()
+            .flatten()
+            .map(|t| t.device_token)
+            .unwrap_or_default();
+        self.backend = Box::new(HttpBackend::new(url, &device_token));
+        Ok(())
+    }
+
     pub fn print(&self, msg: &str) {
         if !self.quiet {
             println!("  {msg}");
