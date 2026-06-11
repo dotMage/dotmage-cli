@@ -33,10 +33,7 @@ pub fn run(
 
     // Check if we already have a valid token (returning device)
     let server_hash = keychain::server_hash(&ctx.config.server_id());
-    let has_tokens = token::load_tokens(&server_hash)
-        .ok()
-        .flatten()
-        .is_some();
+    let has_tokens = token::load_tokens(&server_hash).ok().flatten().is_some();
 
     if has_tokens {
         // Existing device, just re-enter password to cache AK

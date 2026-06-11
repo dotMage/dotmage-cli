@@ -207,7 +207,11 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
     let mut ctx = cmd::Context::load(cli.env, cli.quiet, cli.json)?;
 
     match command {
-        Commands::Auth { server, ttl, enroll } => {
+        Commands::Auth {
+            server,
+            ttl,
+            enroll,
+        } => {
             // If --server provided, update config and recreate backend BEFORE auth runs
             if let Some(ref url) = server {
                 ctx.set_server(url)?;

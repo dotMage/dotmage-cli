@@ -9,9 +9,7 @@ pub fn run(ctx: &Context) -> Result<(), CliError> {
         .backend
         .as_any()
         .downcast_ref::<HttpBackend>()
-        .ok_or_else(|| {
-            CliError::Other("token requires a server connection".into())
-        })?;
+        .ok_or_else(|| CliError::Other("token requires a server connection".into()))?;
 
     let (token, expires_at) = backend.gen_enroll_token("web-admin", "5m")?;
 

@@ -12,9 +12,7 @@ pub fn run(ctx: &Context, app: &str, env: &str, ttl: &str) -> Result<(), CliErro
         .backend
         .as_any()
         .downcast_ref::<HttpBackend>()
-        .ok_or_else(|| {
-            CliError::Other("gen-ci-token requires a server connection".into())
-        })?;
+        .ok_or_else(|| CliError::Other("gen-ci-token requires a server connection".into()))?;
 
     // Get AK from keychain
     let server_hash = keychain::server_hash(&ctx.config.server_id());
@@ -25,7 +23,10 @@ pub fn run(ctx: &Context, app: &str, env: &str, ttl: &str) -> Result<(), CliErro
     // Create scoped device on server
     let resp = backend.create_ci_token(app, env, ttl)?;
 
-    let server_url = ctx.config.server_url.as_deref()
+    let server_url = ctx
+        .config
+        .server_url
+        .as_deref()
         .ok_or_else(|| CliError::Other("server_url not configured".into()))?;
 
     // Bundle device_token + AK + server URL into one opaque token
@@ -41,7 +42,10 @@ pub fn run(ctx: &Context, app: &str, env: &str, ttl: &str) -> Result<(), CliErro
     if ctx.quiet {
         println!("{ci_token}");
     } else {
-        ctx.print(&format!("CI token for {app}/{env} (expires: {}):", resp.token_expires_at));
+        ctx.print(&format!(
+            "CI token for {app}/{env} (expires: {}):",
+            resp.token_expires_at
+        ));
         println!("\n  {ci_token}\n");
         ctx.print("This token gives read access ONLY to this app+env.");
         ctx.print("Store it as a CI secret (e.g. DOTMAGE_CI_TOKEN).");
