@@ -40,6 +40,15 @@ struct RefreshResp {
     token_expires_at: String,
 }
 
+#[derive(Deserialize)]
+pub struct DeviceAuthResp {
+    pub device_token: String,
+    pub refresh_token: String,
+    pub device_id: String,
+    #[allow(dead_code)]
+    pub token_expires_at: String,
+}
+
 impl HttpBackend {
     pub fn new(base_url: &str, device_token: &str) -> Self {
         let server_hash = keychain::server_hash(base_url);
@@ -217,6 +226,74 @@ impl HttpBackend {
         let parsed: Resp =
             serde_json::from_str(&body).map_err(|e| BackendError::Other(e.to_string()))?;
         Ok((parsed.token, parsed.expires_at))
+    }
+
+    /// Register a device using an enrollment token.
+    pub fn register_with_enroll_token(
+        &self,
+        enroll_token: &str,
+        device_name: &str,
+    ) -> Result<DeviceAuthResp, BackendError> {
+        let resp = self
+            .client
+            .post(self.url("/auth/device"))
+            .header("Authorization", format!("Bearer {enroll_token}"))
+            .json(&serde_json::json!({"device_name": device_name}))
+            .send()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+
+        let status = resp.status();
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+        if !status.is_success() {
+            return Err(Self::extract_error(status, &body));
+        }
+        serde_json::from_str(&body).map_err(|e| BackendError::Other(e.to_string()))
+    }
+
+    /// Create a scoped CI token for a specific app+env.
+    pub fn create_ci_token(
+        &self,
+        app: &str,
+        env: &str,
+        ttl: &str,
+    ) -> Result<DeviceAuthResp, BackendError> {
+        let (status, body) = self.auth_post_json(
+            "/devices/ci-token",
+            &serde_json::json!({"app": app, "env": env, "ttl": ttl}),
+        )?;
+
+        if !status.is_success() {
+            return Err(Self::extract_error(status, &body));
+        }
+        serde_json::from_str(&body).map_err(|e| BackendError::Other(e.to_string()))
+    }
+
+    /// Register a device using the bootstrap secret.
+    pub fn register_with_bootstrap(
+        &self,
+        bootstrap_secret: &str,
+        device_name: &str,
+    ) -> Result<DeviceAuthResp, BackendError> {
+        let resp = self
+            .client
+            .post(self.url("/auth/device-register"))
+            .json(&serde_json::json!({
+                "bootstrap_secret": bootstrap_secret,
+                "device_name": device_name,
+            }))
+            .send()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+
+        let status = resp.status();
+        let body = resp
+            .text()
+            .map_err(|e| BackendError::Other(e.to_string()))?;
+        if !status.is_success() {
+            return Err(Self::extract_error(status, &body));
+        }
+        serde_json::from_str(&body).map_err(|e| BackendError::Other(e.to_string()))
     }
 }
 

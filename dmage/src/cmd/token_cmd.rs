@@ -1,25 +1,27 @@
-//! `dmage token` — print current device token.
+//! `dmage token` — generate a one-time login token for the web admin.
 
-use dotmage_client::keychain;
-use dotmage_client::token;
+use dotmage_client::backend_http::HttpBackend;
 
 use super::{CliError, Context};
 
 pub fn run(ctx: &Context) -> Result<(), CliError> {
-    // Try server token first, then local
-    if let Some(ref url) = ctx.config.server_url {
-        let hash = keychain::server_hash(url);
-        if let Ok(Some(t)) = token::load_tokens(&hash) {
-            println!("{}", t.device_token);
-            return Ok(());
-        }
+    let backend = ctx
+        .backend
+        .as_any()
+        .downcast_ref::<HttpBackend>()
+        .ok_or_else(|| {
+            CliError::Other("token requires a server connection".into())
+        })?;
+
+    let (token, expires_at) = backend.gen_enroll_token("web-admin", "5m")?;
+
+    if ctx.quiet {
+        println!("{token}");
+    } else {
+        ctx.print("Web admin login token (one-time, 5 min):");
+        println!("\n  {token}\n");
+        ctx.print(&format!("Expires: {expires_at}"));
+        ctx.print("Paste this token in the web admin login page.");
     }
-
-    let hash = keychain::server_hash(&ctx.config.server_id());
-    let tokens = token::load_tokens(&hash)
-        .map_err(|e| CliError::Other(e.to_string()))?
-        .ok_or(CliError::NotAuthenticated)?;
-
-    println!("{}", tokens.device_token);
     Ok(())
 }

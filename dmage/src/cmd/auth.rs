@@ -3,6 +3,7 @@
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 
+use dotmage_client::backend_http::HttpBackend;
 use dotmage_client::keychain;
 use dotmage_client::token::{self, ServerTokens};
 use dotmage_client::types::*;
@@ -15,6 +16,7 @@ pub fn run(
     ctx: &mut Context,
     _server: Option<String>,
     ttl: Option<String>,
+    enroll: Option<String>,
 ) -> Result<(), CliError> {
     let ttl_secs = parse_ttl(ttl.as_deref()).unwrap_or(ctx.config.key_ttl_secs);
 
@@ -24,9 +26,81 @@ pub fn run(
         return bootstrap(ctx, ttl_secs);
     }
 
-    // Existing account: download keys, derive MK, unwrap AK
-    let keys = ctx.backend.get_account_keys()?;
+    // Account exists — register or unlock this device
+    if let Some(enroll_token) = enroll {
+        return enroll_with_token(ctx, &enroll_token, ttl_secs);
+    }
 
+    // Check if we already have a valid token (returning device)
+    let server_hash = keychain::server_hash(&ctx.config.server_id());
+    let has_tokens = token::load_tokens(&server_hash)
+        .ok()
+        .flatten()
+        .is_some();
+
+    if has_tokens {
+        // Existing device, just re-enter password to cache AK
+        return unlock_existing(ctx, ttl_secs);
+    }
+
+    // New device, no enrollment token → register with bootstrap secret
+    register_with_bootstrap(ctx, ttl_secs)
+}
+
+/// Enroll a device using an enrollment token (CI/programmatic).
+fn enroll_with_token(ctx: &mut Context, enroll_token: &str, ttl_secs: u64) -> Result<(), CliError> {
+    let backend = ctx
+        .backend
+        .as_any()
+        .downcast_ref::<HttpBackend>()
+        .ok_or_else(|| CliError::Other("enroll requires server mode".into()))?;
+
+    let device_name = hostname();
+    let resp = backend.register_with_enroll_token(enroll_token, &device_name)?;
+    save_device_tokens(ctx, &resp)?;
+    ctx.refresh_backend()?;
+
+    unlock_ak(ctx, ttl_secs)?;
+    ctx.success("Device enrolled. Key cached.");
+    Ok(())
+}
+
+/// Register a new device using the bootstrap secret (interactive).
+fn register_with_bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
+    println!("\n  \x1b[36mNew device — register with bootstrap secret\x1b[0m\n");
+
+    let backend = ctx
+        .backend
+        .as_any()
+        .downcast_ref::<HttpBackend>()
+        .ok_or_else(|| CliError::Other("requires server mode".into()))?;
+
+    let bootstrap_secret = prompt_password("Bootstrap secret: ")?;
+    let device_name = hostname();
+    let resp = backend.register_with_bootstrap(&bootstrap_secret, &device_name)?;
+    save_device_tokens(ctx, &resp)?;
+    ctx.refresh_backend()?;
+
+    unlock_ak(ctx, ttl_secs)?;
+
+    let days = ttl_secs / 86400;
+    ctx.success(&format!(
+        "Device registered. Key cached (expires in {days}d)."
+    ));
+    Ok(())
+}
+
+/// Existing device with tokens — just unlock AK with password.
+fn unlock_existing(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
+    unlock_ak(ctx, ttl_secs)?;
+    let days = ttl_secs / 86400;
+    ctx.success(&format!("Authenticated. Key cached (expires in {days}d)."));
+    Ok(())
+}
+
+/// Fetch account keys, prompt password, derive MK, unwrap AK, store in keychain.
+fn unlock_ak(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {
+    let keys = ctx.backend.get_account_keys()?;
     let password = prompt_password("Master password: ")?;
 
     let salt = B64
@@ -64,14 +138,28 @@ pub fn run(
     let ak = envelope::unwrap_ak(&mk, &wrapped)
         .map_err(|_| CliError::Other("invalid password".into()))?;
 
-    // Store AK in keychain
     let server_hash = keychain::server_hash(&ctx.config.server_id());
     keychain::store_ak(&server_hash, &ak, ttl_secs)
         .map_err(|e| CliError::Keychain(e.to_string()))?;
 
-    let days = ttl_secs / 86400;
-    ctx.success(&format!("Authenticated. Key cached (expires in {days}d)."));
     Ok(())
+}
+
+/// Save device tokens returned from enrollment/registration to disk.
+fn save_device_tokens(
+    ctx: &Context,
+    resp: &dotmage_client::backend_http::DeviceAuthResp,
+) -> Result<(), CliError> {
+    let server_hash = keychain::server_hash(&ctx.config.server_id());
+    token::save_tokens(
+        &server_hash,
+        &ServerTokens {
+            device_token: resp.device_token.clone(),
+            refresh_token: resp.refresh_token.clone(),
+            device_id: resp.device_id.clone(),
+        },
+    )
+    .map_err(|e| CliError::Other(e.to_string()))
 }
 
 fn bootstrap(ctx: &mut Context, ttl_secs: u64) -> Result<(), CliError> {

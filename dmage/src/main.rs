@@ -107,8 +107,20 @@ enum Commands {
     },
     /// List all applications.
     Apps,
-    /// Show current device token (for web admin login).
+    /// Generate a one-time login token for the web admin.
     Token,
+    /// Generate a scoped CI token for a specific app+env.
+    GenCiToken {
+        /// Application name.
+        #[arg(long)]
+        app: String,
+        /// Environment name.
+        #[arg(long)]
+        env: String,
+        /// TTL (e.g., "30d").
+        #[arg(long, default_value = "30d")]
+        ttl: String,
+    },
     /// Show sync status.
     Status,
     /// Remove cached key (keep device token).
@@ -195,12 +207,12 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
     let mut ctx = cmd::Context::load(cli.env, cli.quiet, cli.json)?;
 
     match command {
-        Commands::Auth { server, ttl, .. } => {
+        Commands::Auth { server, ttl, enroll } => {
             // If --server provided, update config and recreate backend BEFORE auth runs
             if let Some(ref url) = server {
                 ctx.set_server(url)?;
             }
-            cmd::auth::run(&mut ctx, server, ttl)
+            cmd::auth::run(&mut ctx, server, ttl, enroll)
         }
         Commands::Init { name, file } => cmd::init::run(&mut ctx, &name, &file),
         Commands::Push { name, file } => cmd::push::run(&mut ctx, &name, &file),
@@ -224,6 +236,7 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
         Commands::Rollback { name, rev } => cmd::rollback::run(&mut ctx, &name, rev),
         Commands::Apps => cmd::apps::run(&ctx),
         Commands::Token => cmd::token_cmd::run(&ctx),
+        Commands::GenCiToken { app, env, ttl } => cmd::gen_ci_token::run(&ctx, &app, &env, &ttl),
         Commands::Status => cmd::status::run(&ctx),
         Commands::Lock => cmd::lock::run(&ctx),
         Commands::Logout => cmd::lock::run_logout(&ctx),
@@ -242,6 +255,75 @@ fn run(cli: Cli) -> Result<(), cmd::CliError> {
             }),
         ),
         Commands::Help => unreachable!(),
+    }
+}
+
+fn check_for_update() -> Option<String> {
+    let cache_path = dotmage_client::config::Config::default_dir().join("update_check.json");
+
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct UpdateCache {
+        checked_at: u64,
+        latest_version: String,
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+
+    let current = env!("CARGO_PKG_VERSION");
+
+    // Read cache — if fresh enough, use it
+    if let Ok(data) = std::fs::read_to_string(&cache_path) {
+        if let Ok(cache) = serde_json::from_str::<UpdateCache>(&data) {
+            if now.saturating_sub(cache.checked_at) < 86400 {
+                return if cache.latest_version != current {
+                    Some(cache.latest_version)
+                } else {
+                    None
+                };
+            }
+        }
+    }
+
+    // Fetch from GitHub (3s timeout, ignore errors)
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .ok()?;
+
+    let resp = client
+        .get("https://api.github.com/repos/dotMage/dotmage/releases/latest")
+        .header("User-Agent", "dmage-cli")
+        .send()
+        .ok()?;
+
+    if !resp.status().is_success() {
+        return None;
+    }
+
+    #[derive(serde::Deserialize)]
+    struct GhRelease {
+        tag_name: String,
+    }
+
+    let release: GhRelease = resp.json().ok()?;
+    let latest = release.tag_name.trim_start_matches('v').to_string();
+
+    // Save cache
+    let cache = UpdateCache {
+        checked_at: now,
+        latest_version: latest.clone(),
+    };
+    if let Ok(json) = serde_json::to_string(&cache) {
+        let _ = std::fs::write(&cache_path, json);
+    }
+
+    if latest != current {
+        Some(latest)
+    } else {
+        None
     }
 }
 
@@ -276,6 +358,13 @@ fn print_banner() {
         }
     } else {
         println!("  server   \x1b[90m(local mode)\x1b[0m");
+    }
+
+    // Update check
+    if let Some(latest) = check_for_update() {
+        println!();
+        println!("  \x1b[33mupdate available: v{latest}  (current: v{version})\x1b[0m");
+        println!("  \x1b[90mhttps://github.com/dotMage/dotmage/releases\x1b[0m");
     }
 
     println!();

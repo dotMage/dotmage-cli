@@ -2,7 +2,6 @@
 //!
 //! Stores AK in a local file. OS keychain requires code-signed binaries
 //! on macOS, so file storage is used as the reliable default.
-//! Env var `DOTMAGE_AK` supported for CI/headless.
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
@@ -52,11 +51,6 @@ pub fn store_ak(server_hash: &str, ak: &[u8; 32], ttl_secs: u64) -> Result<(), K
 
 /// Load AK, checking expiry. Returns None if expired or missing.
 pub fn load_ak(server_hash: &str) -> Result<Option<[u8; 32]>, KeychainError> {
-    // Env var override (CI/headless)
-    if let Ok(ak_b64) = std::env::var("DOTMAGE_AK") {
-        return decode_ak(&ak_b64).map(Some);
-    }
-
     let path = ak_file_path(server_hash);
     if !path.exists() {
         return Ok(None);

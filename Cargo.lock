@@ -359,7 +359,10 @@ dependencies = [
  "dotmage-crypto",
  "hex",
  "libc",
+ "reqwest",
  "rpassword",
+ "serde",
+ "serde_json",
  "sha2",
  "thiserror",
 ]
