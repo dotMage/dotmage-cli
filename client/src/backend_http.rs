@@ -49,6 +49,11 @@ pub struct DeviceAuthResp {
     pub token_expires_at: String,
 }
 
+/// Encode a value for use in a URL path segment (escapes `/` etc.)
+fn encode_path(s: &str) -> String {
+    s.replace('%', "%25").replace('/', "%2F")
+}
+
 impl HttpBackend {
     pub fn new(base_url: &str, device_token: &str) -> Self {
         let server_hash = keychain::server_hash(base_url);
@@ -451,7 +456,7 @@ impl Backend for HttpBackend {
     }
 
     fn list_envs(&self, app: &str) -> Result<Vec<EnvInfo>, BackendError> {
-        let (status, body) = self.auth_get(&format!("/apps/{app}/envs"))?;
+        let (status, body) = self.auth_get(&format!("/apps/{}/envs", encode_path(app)))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -490,7 +495,8 @@ impl Backend for HttpBackend {
         if let Some(src) = copy_from {
             body["copy_from"] = serde_json::Value::String(src.to_string());
         }
-        let (status, resp_body) = self.auth_post_json(&format!("/apps/{app}/envs"), &body)?;
+        let (status, resp_body) =
+            self.auth_post_json(&format!("/apps/{}/envs", encode_path(app)), &body)?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &resp_body));
         }
@@ -501,7 +507,11 @@ impl Backend for HttpBackend {
         let (hdr, val) = self.auth_header();
         let resp = self
             .client
-            .delete(self.url(&format!("/apps/{app}/envs/{env}")))
+            .delete(self.url(&format!(
+                "/apps/{}/envs/{}",
+                encode_path(app),
+                encode_path(env)
+            )))
             .header(&hdr, &val)
             .send()
             .map_err(|e| BackendError::Other(e.to_string()))?;
@@ -524,7 +534,11 @@ impl Backend for HttpBackend {
         parent_rev: u64,
     ) -> Result<RevisionMeta, BackendError> {
         let (status, body) = self.auth_post_json(
-            &format!("/apps/{app}/envs/{env}/revisions"),
+            &format!(
+                "/apps/{}/envs/{}/revisions",
+                encode_path(app),
+                encode_path(env)
+            ),
             &serde_json::json!({
                 "blob": blob,
                 "parent_rev": parent_rev,
@@ -558,8 +572,11 @@ impl Backend for HttpBackend {
             RevSpec::Latest => "last".to_string(),
             RevSpec::Number(n) => n.to_string(),
         };
-        let (status, body) =
-            self.auth_get(&format!("/apps/{app}/envs/{env}/revisions/{rev_str}"))?;
+        let (status, body) = self.auth_get(&format!(
+            "/apps/{}/envs/{}/revisions/{rev_str}",
+            encode_path(app),
+            encode_path(env)
+        ))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -567,7 +584,11 @@ impl Backend for HttpBackend {
     }
 
     fn list_revisions(&self, app: &str, env: &str) -> Result<Vec<RevisionMeta>, BackendError> {
-        let (status, body) = self.auth_get(&format!("/apps/{app}/envs/{env}/revisions"))?;
+        let (status, body) = self.auth_get(&format!(
+            "/apps/{}/envs/{}/revisions",
+            encode_path(app),
+            encode_path(env)
+        ))?;
         if !status.is_success() {
             return Err(Self::extract_error(status, &body));
         }
@@ -583,7 +604,11 @@ impl Backend for HttpBackend {
 
     fn rollback(&self, app: &str, env: &str, to_rev: u64) -> Result<RevisionMeta, BackendError> {
         let (status, body) = self.auth_post_json(
-            &format!("/apps/{app}/envs/{env}/rollback"),
+            &format!(
+                "/apps/{}/envs/{}/rollback",
+                encode_path(app),
+                encode_path(env)
+            ),
             &serde_json::json!({"to_rev": to_rev}),
         )?;
 

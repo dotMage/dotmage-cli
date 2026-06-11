@@ -61,7 +61,7 @@ impl FsBackend {
     }
 
     fn app_dir(&self, app: &str) -> PathBuf {
-        self.root.join("apps").join(app)
+        self.root.join("apps").join(app.replace('/', "%2F"))
     }
 
     fn env_dir(&self, app: &str, env: &str) -> PathBuf {
@@ -202,10 +202,12 @@ impl Backend for FsBackend {
 
     fn list_apps(&self) -> Result<Vec<AppInfo>, BackendError> {
         let apps_dir = self.root.join("apps");
-        let names = Self::list_subdirs(&apps_dir)?;
+        let dir_names = Self::list_subdirs(&apps_dir)?;
         let mut result = Vec::new();
-        for name in names {
-            let envs = self.list_envs(&name)?;
+        for dir_name in dir_names {
+            // Decode %2F back to / for display (app_dir encodes / → %2F on disk)
+            let app_name = dir_name.replace("%2F", "/");
+            let envs = self.list_envs(&app_name)?;
             let updated_at = envs
                 .iter()
                 .map(|e| e.updated_at.as_str())
@@ -213,7 +215,7 @@ impl Backend for FsBackend {
                 .unwrap_or("")
                 .to_string();
             result.push(AppInfo {
-                name: name.clone(),
+                name: app_name,
                 environments: envs.iter().map(|e| e.name.clone()).collect(),
                 updated_at,
             });
